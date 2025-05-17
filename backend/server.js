@@ -13,12 +13,10 @@ const GratitudeEntry = require('./models/GratitudeEntry');
 const app = express();
 app.use(express.json());
 
-// Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Conectado a MongoDB'))
   .catch(err => console.error('Error conectando a MongoDB:', err));
 
-// Middleware de autenticación
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No token provided' });
@@ -29,32 +27,26 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Middleware para restringir acceso según el rol
-const restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'No tienes permiso para realizar esta acción' });
-    }
-    next();
-  };
-};
-
-// Endpoint de login
 app.post('/api/auth/signin', async (req, res) => {
   try {
+    console.log('Datos recibidos en /api/auth/signin:', req.body);
     const { email, password } = req.body;
     if (!email || !password) {
+      console.log('Faltan email o contraseña');
       return res.status(400).json({ message: 'Email y contraseña son requeridos' });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Usuario no encontrado' });
+      console.log('Usuario no encontrado:', email);
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
+    console.log('Usuario encontrado:', user);
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Contraseña incorrecta' });
+      console.log('Contraseña incorrecta para:', email);
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
     const token = jwt.sign(
@@ -62,15 +54,17 @@ app.post('/api/auth/signin', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    res.json({ token });
+    console.log('Token generado:', token);
+    res.status(200).json({ token });
   } catch (error) {
+    console.error('Error en /api/auth/signin:', error);
     res.status(500).json({ message: 'Error al iniciar sesión', error: error.message });
   }
 });
 
-// Endpoint para registrar usuarios
 app.post('/api/auth/signup', async (req, res) => {
   try {
+    console.log('Datos recibidos en /api/auth/signup:', req.body);
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) {
       return res.status(400).json({ message: 'Email, contraseña y nombre son requeridos' });
@@ -85,21 +79,53 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Contraseña hasheada:', hashedPassword);
+
     const user = new User({ email, password: hashedPassword, name, role: userRole });
-    await user.save();
+    const savedUser = await user.save(); // Usa una variable para el usuario guardado
+    console.log('Usuario guardado:', savedUser);
+
+    if (savedUser.password !== hashedPassword) {
+      console.error('Error: el hash guardado no coincide con el hasheado:', savedUser.password);
+    }
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role, name: user.name },
+      { id: savedUser._id, email: savedUser.email, role: savedUser.role, name: savedUser.name },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
     res.status(201).json({ token });
   } catch (error) {
+    console.error('Error en /api/auth/signup:', error);
     res.status(500).json({ message: 'Error al registrar usuario', error: error.message });
   }
 });
 
-// Endpoint para obtener learning paths
+// Otros endpoints existentes (moods, gratitudes, etc.)
+app.post('/api/moods', authenticateToken, async (req, res) => {
+  try {
+    const { mood, emotion, place, comment } = req.body;
+    const userId = req.user.id;
+    const newMood = new Mood({ userId, mood, emotion, place, comment });
+    await newMood.save();
+    res.status(201).json({ message: 'Mood guardado', data: newMood });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al guardar mood', error });
+  }
+});
+
+app.get('/api/moods/last-seven-days', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const moods = await Mood.find({ userId, date: { $gte: sevenDaysAgo } }).sort('date');
+    res.json({ data: moods });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener moods', error });
+  }
+});
+
 app.get('/api/learning-paths', authenticateToken, async (req, res) => {
   try {
     const learningPaths = await LearningPath.find();
@@ -109,7 +135,6 @@ app.get('/api/learning-paths', authenticateToken, async (req, res) => {
   }
 });
 
-// Endpoint para obtener gratitudes de los últimos 7 días
 app.get('/api/gratitude/last-seven-days', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -122,7 +147,6 @@ app.get('/api/gratitude/last-seven-days', authenticateToken, async (req, res) =>
   }
 });
 
-// Endpoint para guardar gratitudes
 app.post('/api/gratitude', authenticateToken, async (req, res) => {
   try {
     const { text } = req.body;
@@ -136,34 +160,7 @@ app.post('/api/gratitude', authenticateToken, async (req, res) => {
   }
 });
 
-// Endpoint para guardar moods
-app.post('/api/moods', authenticateToken, restrictTo('student'), async (req, res) => {
-  try {
-    const { mood, emotion, place, comment } = req.body;
-    const userId = req.user.id;
-    const newMood = new Mood({ userId, mood, emotion, place, comment });
-    await newMood.save();
-    res.status(201).json({ message: 'Mood guardado', data: newMood });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al guardar mood', error });
-  }
-});
-
-// Endpoint para obtener los últimos 7 días de moods
-app.get('/api/moods/last-seven-days', authenticateToken, restrictTo('student'), async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const moods = await Mood.find({ userId, date: { $gte: sevenDaysAgo } }).sort('date');
-    res.json({ data: moods });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener moods', error });
-  }
-});
-
-// Endpoint para analizar emociones con IA personalizada
-app.post('/api/analyze-emotions', authenticateToken, restrictTo('student'), async (req, res) => {
+app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const sevenDaysAgo = new Date();

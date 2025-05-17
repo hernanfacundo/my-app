@@ -2,8 +2,8 @@ import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import globalStyles from '../globalStyles';
-import theme from '../theme';
+import globalStyles from '../screens/globalStyles';
+import theme from '../screens/theme';
 import config from '../config';
 
 const SignInScreen = ({ navigation }) => {
@@ -12,11 +12,12 @@ const SignInScreen = ({ navigation }) => {
   const { login } = useContext(AuthContext);
 
   const handleSignIn = async () => {
+    console.log('Datos enviados al backend:', { email, password });
     try {
       const response = await axios.post(`${config.API_BASE_URL}/auth/signin`, { email, password });
       const { token } = response.data;
       await login(token);
-      navigation.navigate('Home');
+      navigation.navigate('Dashboard');
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar sesión. Verifica tus credenciales.');
       console.error('Error al iniciar sesión:', error);

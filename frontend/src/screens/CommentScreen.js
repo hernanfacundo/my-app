@@ -32,28 +32,26 @@ const CommentScreen = ({ navigation, route }) => {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) throw new Error('No token found');
-
-      // Decodificar el token para obtener el email del usuario
+  
       const decodedToken = decodeToken(token);
       const userEmail = decodedToken.email || 'Usuario';
       const userName = userEmail.split('@')[0];
-
-      // Guardar el mood
+  
+      const url = `${config.API_BASE_URL.replace(/\/api$/, '')}/api/moods`; // Elimina /api duplicado
+      console.log('Enviando solicitud a:', url, 'con datos:', { mood, emotion, place, comment });
       await axios.post(
-        `${config.API_BASE_URL}/moods`,
+        url,
         { mood, emotion, place, comment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Obtener el análisis emocional personalizado de los últimos 7 días
+  
       const response = await axios.post(
-        `${config.API_BASE_URL}/analyze-emotions`,
+        `${config.API_BASE_URL.replace(/\/api$/, '')}/api/analyze-emotions`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const personalizedMessage = response.data.analysis || 'Hola, no tengo suficiente info para charlar, pero estoy acá para vos. ¿Qué te gustaría contarme?';
-
-      // Mostrar alerta con el mensaje personalizado
+  
       Alert.alert(
         'Estado Guardado',
         personalizedMessage,

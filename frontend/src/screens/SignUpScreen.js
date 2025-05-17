@@ -3,8 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'reac
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import globalStyles from '../globalStyles';
-import theme from '../theme';
+import globalStyles from '../screens/globalStyles';
+import theme from '../screens/theme';
 import config from '../config';
 
 const SignUpScreen = ({ navigation }) => {
@@ -15,11 +15,12 @@ const SignUpScreen = ({ navigation }) => {
   const { login } = useContext(AuthContext);
 
   const handleSignUp = async () => {
+    console.log('Datos enviados al registro:', { email, password, name, role });
     try {
       const response = await axios.post(`${config.API_BASE_URL}/auth/signup`, { email, password, name, role });
       const { token } = response.data;
       await login(token);
-      navigation.navigate('Home');
+      navigation.navigate('Dashboard');
     } catch (error) {
       Alert.alert('Error', 'No se pudo registrar el usuario. Verifica los datos.');
       console.error('Error al registrar usuario:', error);

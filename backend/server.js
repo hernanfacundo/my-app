@@ -101,8 +101,32 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
+app.post('/api/moods', authenticateToken, async (req, res) => {
+  console.log('Solicitud recibida en /api/moods (POST) para userId:', req.user.id, 'con datos:', req.body);
+  try {
+    const { mood, emotion, place, comment } = req.body;
+    if (!mood || !emotion || !place) {
+      return res.status(400).json({ message: 'Mood, emoción y lugar son requeridos' });
+    }
+    const newMood = new Mood({
+      userId: req.user.id,
+      mood,
+      emotion,
+      place,
+      comment,
+      createdAt: new Date(),
+    });
+    const savedMood = await newMood.save();
+    res.status(201).json(savedMood);
+  } catch (error) {
+    console.error('Error al guardar mood:', error);
+    res.status(500).json({ message: 'Error al guardar mood', error: error.message });
+  }
+});
+
 // Otros endpoints existentes (moods, gratitudes, etc.)
 app.get('/api/moods', authenticateToken, async (req, res) => {
+  console.log('Solicitud recibida en /api/moods para userId:', req.user.id);
   try {
     const moods = await Mood.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.status(200).json(moods);

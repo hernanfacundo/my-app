@@ -1,45 +1,28 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import jwtDecode from 'jwt-decode';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (token) {
-          const decoded = jwtDecode(token);
-          setUser({
-            id: decoded.id,
-            email: decoded.email,
-            role: decoded.role,
-            name: decoded.name,
-          });
-        }
-      } catch (error) {
-        console.error('Error al cargar el usuario:', error);
+    const loadStoredUser = async () => {
+      const storedToken = await AsyncStorage.getItem('userToken');
+      if (storedToken) {
+        setUser({ token: storedToken }); // Ajusta según la estructura de tu token
       }
     };
-    loadUser();
+    loadStoredUser();
   }, []);
 
   const login = async (token) => {
-    await AsyncStorage.setItem('token', token);
-    const decoded = jwtDecode(token);
-    setUser({
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
-      name: decoded.name,
-    });
+    await AsyncStorage.setItem('userToken', token);
+    setUser({ token }); // Asegúrate de que el token se actualice
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('userToken');
     setUser(null);
   };
 
@@ -49,3 +32,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export { AuthContext, AuthProvider };

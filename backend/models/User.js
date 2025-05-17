@@ -1,15 +1,16 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  name: { type: String, required: true }, // Nuevo campo
-  role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' }, // Nuevo campo
+  name: { type: String, required: true },
+  role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
 }, { timestamps: true });
 
-userSchema.pre('save', async function (next) {
-  if (this.isModified('password')) {
+// Elimina cualquier middleware pre-save que re-hashee la contraseña
+userSchema.pre('save', async function(next) {
+  // Si la contraseña ya está hasheada, no la vuelvas a hashear
+  if (this.password && !this.password.startsWith('$2b$')) {
     this.password = await bcrypt.hash(this.password, 10);
   }
   next();

@@ -198,59 +198,11 @@ app.get('/api/gratitude/last-seven-days', authenticateToken, async (req, res) =>
 app.post('/api/gratitude', authenticateToken, async (req, res) => {
   try {
     const { text } = req.body;
-    const userId   = req.user.id;
-    const date     = new Date();
+    const userId = req.user.id;
+    const date = new Date();
     const newGratitude = new GratitudeEntry({ userId, text, date });
     await newGratitude.save();
-    
-    // ——— Memoria episódica: últimas 5 entradas ———
-    const recent = await GratitudeEntry
-      .find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(5);
-    const summary = recent
-      .map(g => `El ${g.date.toLocaleDateString()}: “${g.text}”`)
-      .reverse()
-      .join('\n');
-
-    // ——— Prompt para OpenAI ———
-    const systemPrompt = `
-Eres un mentor de gratitud para adolescentes.
-Tu tarea: después de cada entrada de gratitud,
-• Felicita al usuario por su práctica.
-• Refleja brevemente su historial (ver abajo).
-• Formula 2 o 3 preguntas abiertas para profundizar su gratitud.
-
-Historial reciente:
-${summary}
-Usuario acaba de decir: “${text}”
-`;
-
-    // Llamada a OpenAI
-    const openaiRes = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system',  content: systemPrompt.trim() },
-          { role: 'user',    content: text }
-        ],
-        max_tokens: 150,
-        temperature: 0.7
-      },
-      { headers: {
-          'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
-          'Content-Type': 'application/json'
-      }}
-    );
-    const questions = openaiRes.data.choices[0].message.content.trim();
-
-    // ——— Devolvemos la entrada  las preguntas ———
-    return res.status(201).json({
-      message:  'Gratitud guardada',
-      data:     newGratitude,
-      reflect:  questions
-    });
+    res.status(201).json({ message: 'Gratitud guardada', data: newGratitude });
   } catch (error) {
     res.status(500).json({ message: 'Error al guardar gratitud', error: error.message });
   }
@@ -282,13 +234,6 @@ app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
     const placeList = moods.map(m => m.place).join(', ');
 
     const prompt = `Eres un experto en comunicación con adolescentes, psicología y pedagogía. 
-    Tu misión es:
-    1. Reflejar lo que el usuario expresa.
-    2. Formular siempre preguntas abiertas para invitarlo a profundizar:
-          “¿Qué significa eso para ti?”
-          “¿Cómo viviste esa experiencia?”
-          “¿Qué crees que desencadenó esa emoción?”
-    3. Mantener un tono cálido y curioso, ofreciendo confianza y seguridad.
     En los últimos días, el usuario se sintió ${moodList} con las siguientes emociones ${emotionList} 
     y en los siguientes lugares ${placeList}. Elabora un resumen breve (1-2 frases) sobre el estado 
     de ánimo en los últimos días con esa información para presentarle al usuario. El mensaje debe 
@@ -340,69 +285,76 @@ app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
 // Agregar después de los otros endpoints, antes de app.listen
 
 app.post('/api/chatbot', authenticateToken, async (req, res) => {
-const userMessage = req.body.message;
+  try {
+    const { message } = req.body;
+    console.log('Mensaje recibido en chatbot:', message);
 
-// 1) Memoria episódica: últimos 3 moods
-const recentMoods = await Mood
-  .find({ userId: req.user.id })
-  .sort({ createdAt: -1 })
-  .limit(3);
-const moodSummary = recentMoods.map(m =>
-  `El ${m.createdAt.toLocaleDateString()}: nivel ${m.mood}, emociones: ${m.emotion}.`
-).join('\n');
+    if (!message) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'El mensaje es requerido' 
+      });
+    }
 
-// 2) Memoria de conversación previa
-let history = [];
-const lastConv = await ChatConversation
-  .findOne({ userId: req.user.id })
-  .sort({ createdAt: -1 });
-if (lastConv) {
-  history = lastConv.messages.map(msg => ({
-    role: msg.sender === 'user' ? 'user' : 'assistant',
-    content: msg.content
-  }));
-}
+    const prompt = `Eres un asistente amigable y empático, especializado en hablar con adolescentes. 
+    Responde al siguiente mensaje del usuario de forma comprensiva y cercana: "${message}"`;
 
-// 3) Arma el prompt completo
-const systemPrompt = `
-Eres un asistente emocional para adolescentes.
-Usuario: ${req.user.name} (${req.user.role}).
-Historial reciente:
-${moodSummary}
-`;
-const messages = [
-  { role: 'system', content: systemPrompt.trim() },
-  ...history,
-  { role: 'user', content: userMessage }
-];
+    const openaiResponse = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 150,
+        temperature: 0.7
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-// Reemplaza tu llamada original a OpenAI por esta:
-   const openaiRes = await axios.post(
-     'https://api.openai.com/v1/chat/completions',
-     { model: 'gpt-3.5-turbo', messages, max_tokens: 200 },
-     { headers: { Authorization: `Bearer ${process.env.CHATGPT_API_KEY}` } }
-   );
-const botText = openaiRes.data.choices[0].message.content.trim();
+    console.log('Respuesta de OpenAI recibida para chatbot');
+    const botResponse = openaiResponse.data.choices[0].message.content.trim();
 
-// 4) Guarda o actualiza la conversación
-if (lastConv) {
-  lastConv.messages.push(
-    { content: userMessage, sender:'user',  timestamp:new Date() },
-    { content: botText,      sender:'bot',   timestamp:new Date() }
-  );
-  await lastConv.save();
-} else {
-  await new ChatConversation({
-    userId: req.user.id,
-    messages: [
-      { content:userMessage, sender:'user',  timestamp:new Date() },
-      { content:botText,      sender:'bot',   timestamp:new Date() }
-    ]
-  }).save();
-}
+    // Crear y guardar la conversación con el formato correcto
+    const conversation = new ChatConversation({
+      userId: new mongoose.Types.ObjectId(req.user.id),
+      messages: [
+        {
+          content: message,
+          sender: 'user',
+          timestamp: new Date()
+        },
+        {
+          content: botResponse,
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ]
+    });
 
-return res.json({ success:true, response: botText });
- });
+    await conversation.save();
+    console.log('Conversación guardada exitosamente');
+
+    return res.json({ 
+      success: true,
+      response: botResponse 
+    });
+
+  } catch (error) {
+    console.error('Error en chatbot:', error);
+    if (error.response?.data) {
+      console.error('Detalles del error de OpenAI:', error.response.data);
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Error al procesar mensaje',
+      error: error.message
+    });
+  }
+});
 
 app.post('/api/chat-conversations', authenticateToken, async (req, res) => {
   try {

@@ -13,12 +13,27 @@ const ChatbotScreen = ({ navigation, route }) => {
   const initialMessage = route.params?.analysis || 'Hola, soy tu amigo virtual. Estoy acá para charlar sobre cómo te sentís. ¿Qué tenés en mente?';
 
   useEffect(() => {
-    // Reformular el mensaje inicial para que sea más empático e invite a la charla
-    const reformulatedMessage = initialMessage.includes('Esta semana')
-      ? `${initialMessage.split('¿Querés hablar de cómo te está yendo?')[0]} Estoy acá para escucharte, ¿qué te gustaría compartir conmigo?`
-      : initialMessage;
-
-    setMessages([{ id: '1', text: reformulatedMessage, sender: 'bot' }]);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const res   = await axios.get(
+          `${config.API_BASE_URL}/chat-conversations`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.data.messages?.length) {
+          setMessages(res.data.messages.map((m,i) => ({
+            id:     i.toString(),
+            text:   m.content,
+            sender: m.sender
+          })));
+          return;
+        }
+      } catch (e) { /* … */ }
+     // Si no hay historial, usamos initialPrompt o el saludo genérico
+     const prompt = route.params?.initialPrompt
+       ?? 'Hola, soy tu acompañante. ¿En qué quieres profundizar hoy?';
+     setMessages([{ id:'0', text:prompt, sender:'bot' }]);
+    })();
   }, [initialMessage]);
 
   const sendMessage = async () => {

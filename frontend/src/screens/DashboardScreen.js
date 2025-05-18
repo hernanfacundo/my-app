@@ -24,27 +24,14 @@ const DashboardScreen = ({ navigation }) => {
   useEffect(() => {
     const fetchLearningPaths = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          console.error('Token no encontrado');
-          Alert.alert('Error', 'Por favor, inicia sesión nuevamente');
-          navigation.navigate('SignIn');
-          return;
-        }
-        console.log('Solicitando learning-paths desde:', `${config.API_BASE_URL}/learning-paths`);
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) throw new Error('No token found');
         const response = await axios.get(`${config.API_BASE_URL}/learning-paths`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log('Respuesta de learning-paths:', response.data);
-        if (response.data.data && Array.isArray(response.data.data)) {
-          setLearningPaths(response.data.data);
-        } else {
-          console.warn('Datos de learning-paths no son un arreglo válido:', response.data);
-          setLearningPaths([]);
-        }
+        setLearningPaths(response.data.data);
       } catch (error) {
         console.error('Error al obtener learning-paths:', error.response?.data || error.message);
-        Alert.alert('Error', error.response?.data?.message || 'No se pudieron cargar los caminos de aprendizaje');
       }
     };
 
@@ -55,7 +42,7 @@ const DashboardScreen = ({ navigation }) => {
   const checkGratitudeToday = async () => {
     try {
       setIsLoadingGratitude(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         Alert.alert('Error', 'Por favor, inicia sesión nuevamente');
         navigation.navigate('SignIn');

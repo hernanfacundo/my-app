@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Video, Audio } from 'expo-av'; // Usamos expo-av para video y audio
 import globalStyles from '../screens/globalStyles';
 import theme from '../screens/theme';

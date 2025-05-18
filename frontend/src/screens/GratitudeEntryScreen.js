@@ -20,7 +20,7 @@ const GratitudeEntryScreen = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         Alert.alert('Error', 'Por favor, inicia sesión nuevamente');
         navigation.navigate('SignIn');
@@ -29,11 +29,11 @@ const GratitudeEntryScreen = ({ navigation }) => {
 
       console.log('Token enviado al backend:', token);
       console.log('URL de la solicitud:', `${config.API_BASE_URL}/gratitude`);
-      console.log('Enviando al backend:', { message: trimmedText });
+      console.log('Enviando al backend:', { text: trimmedText });
 
       const response = await axios.post(
         `${config.API_BASE_URL}/gratitude`,
-        { message: trimmedText },
+        { text: trimmedText },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

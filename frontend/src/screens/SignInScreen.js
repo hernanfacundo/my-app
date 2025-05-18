@@ -1,5 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import globalStyles from '../screens/globalStyles';
@@ -12,10 +13,10 @@ const SignInScreen = ({ navigation }) => {
   const { login } = useContext(AuthContext);
 
   const handleSignIn = async () => {
-    console.log('Datos enviados al backend:', { email, password });
     try {
       const response = await axios.post(`${config.API_BASE_URL}/auth/signin`, { email, password });
       const { token } = response.data;
+      await AsyncStorage.setItem('userToken', token); // Usa 'userToken'
       await login(token);
       navigation.navigate('Dashboard');
     } catch (error) {

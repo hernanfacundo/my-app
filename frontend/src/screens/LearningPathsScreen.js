@@ -37,7 +37,7 @@ const LearningPathsScreen = ({ navigation }) => {
   useEffect(() => {
     const fetchLearningPaths = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
+        const token = await AsyncStorage.getItem('userToken');
         if (!token) {
           console.error('Token no encontrado');
           Alert.alert('Error', 'Por favor, inicia sesión nuevamente');

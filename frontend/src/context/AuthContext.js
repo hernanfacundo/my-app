@@ -8,19 +8,20 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const loadStoredUser = async () => {
-      const storedToken = await AsyncStorage.getItem('userToken');
+      const storedToken = await AsyncStorage.getItem('userToken'); // Usa 'userToken'
       if (storedToken) {
-        setUser({ token: storedToken }); // Ajusta según la estructura de tu token
+        setUser({ token: storedToken });
       }
     };
     loadStoredUser();
   }, []);
 
   const login = async (token) => {
-    await AsyncStorage.setItem('userToken', token);
-    setUser({ token }); // Asegúrate de que el token se actualice
+    console.log('Guardando token:', token);
+    await AsyncStorage.setItem('userToken', token); // Usa 'userToken'
+    setUser({ token });
   };
-
+  
   const logout = async () => {
     await AsyncStorage.removeItem('userToken');
     setUser(null);

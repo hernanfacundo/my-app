@@ -30,7 +30,7 @@ const CommentScreen = ({ navigation, route }) => {
 
   const handleSaveMood = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) throw new Error('No token found');
   
       const decodedToken = decodeToken(token);

@@ -30,7 +30,7 @@ const ChatbotScreen = ({ navigation, route }) => {
     setIsLoading(true);
 
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       const response = await axios.post(
         `${config.API_BASE_URL}/chatbot`,
         { message: input },
@@ -56,7 +56,7 @@ const ChatbotScreen = ({ navigation, route }) => {
 
   const saveConversation = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       const userId = decodeToken(token).id; // Usamos la misma función de decodificación
       await axios.post(
         `${config.API_BASE_URL}/chat-conversations`,

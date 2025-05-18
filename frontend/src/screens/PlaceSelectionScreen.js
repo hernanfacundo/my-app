@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import globalStyles from '../screens/globalStyles'; // Ajustamos la ruta
 import theme from '../screens/theme'; // Ajustamos la ruta
 

@@ -1,6 +1,9 @@
 require('dotenv').config();
+console.log('JWT_SECRET:', process.env.JWT_SECRET);
 const express = require('express');
+const cors = require('cors'); // <-- Agrega esta línea
 const mongoose = require('mongoose');
+const { ObjectId } = require('mongoose').Types;
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
@@ -11,11 +14,13 @@ const LearningPath = require('./models/LearningPath');
 const GratitudeEntry = require('./models/GratitudeEntry');
 
 const app = express();
+app.use(cors()); // <-- Aplica CORS a todas las rutas
 app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Conectado a MongoDB'))
   .catch(err => console.error('Error conectando a MongoDB:', err));
+
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -29,6 +34,7 @@ const authenticateToken = (req, res, next) => {
 
 app.post('/api/auth/signin', async (req, res) => {
   try {
+    console.log('JWT_SECRET:', process.env.JWT_SECRET);
     console.log('Datos recibidos en /api/auth/signin:', req.body);
     const { email, password } = req.body;
     if (!email || !password) {
@@ -108,19 +114,38 @@ app.post('/api/moods', authenticateToken, async (req, res) => {
     if (!mood || !emotion || !place) {
       return res.status(400).json({ message: 'Mood, emoción y lugar son requeridos' });
     }
-    const newMood = new Mood({
+
+    console.log('Creando nuevo mood con datos:', {
       userId: req.user.id,
       mood,
       emotion,
       place,
-      comment,
-      createdAt: new Date(),
+      comment: comment || '',
+      createdAt: new Date()
     });
+
+    const newMood = new Mood({
+      userId: req.user.id,  // Cambiamos esta línea para usar directamente el id
+      mood,
+      emotion,
+      place,
+      comment: comment || '',
+      createdAt: new Date()
+    });
+
+    console.log('Mood creado, intentando guardar...');
     const savedMood = await newMood.save();
-    res.status(201).json(savedMood);
+    console.log('Mood guardado exitosamente:', savedMood);
+    
+    res.status(201).json({ message: 'Mood guardado', data: savedMood });
   } catch (error) {
-    console.error('Error al guardar mood:', error);
-    res.status(500).json({ message: 'Error al guardar mood', error: error.message });
+    console.error('Error detallado al guardar mood:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      message: 'Error al guardar mood', 
+      error: error.message,
+      stack: error.stack 
+    });
   }
 });
 
@@ -141,10 +166,11 @@ app.get('/api/moods/last-seven-days', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const moods = await Mood.find({ userId, date: { $gte: sevenDaysAgo } }).sort('date');
+    // Cambiar "date" por "createdAt" para que coincida con el campo guardado en POST /api/moods
+    const moods = await Mood.find({ userId, createdAt: { $gte: sevenDaysAgo } }).sort({ createdAt: 1 });
     res.json({ data: moods });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener moods', error });
+    res.status(500).json({ message: 'Error al obtener moods', error: error.message });
   }
 });
 
@@ -187,52 +213,99 @@ app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const moods = await Mood.find({ userId, date: { $gte: sevenDaysAgo } }).sort('date');
+
+    console.log('Iniciando análisis de emociones para usuario:', userId);
+
+    const moods = await Mood.find({ 
+      userId, 
+      createdAt: { $gte: sevenDaysAgo } 
+    }).sort({ createdAt: 1 });
+
+    console.log('Moods encontrados:', moods.length);
+
+    if (!moods || moods.length === 0) {
+      return res.status(200).json({ 
+        analysis: "No hay suficientes datos para analizar tus emociones. ¿Te gustaría conversar sobre cómo te sientes ahora?" 
+      });
+    }
 
     const moodList = moods.map(m => m.mood).join(', ');
     const emotionList = moods.map(m => m.emotion).join(', ');
     const placeList = moods.map(m => m.place).join(', ');
 
-    const prompt = `Eres un experto en comunicación con adolescentes, psicología y pedagogía. En los últimos días, el usuario se sintió ${moodList} con las siguientes emociones ${emotionList} y en los siguientes lugares ${placeList}. Elabora un resumen breve (1-2 frases) sobre el estado de ánimo en los últimos días con esa información para presentarle al usuario. El mensaje debe ser amistoso, empático, en segunda persona (el usuario recibirá el mensaje directamente) y adaptado a un adolescente. Usa un tono cercano y motivador, evitando juicios o asumir emociones positivas/negativas de forma predeterminada. Termina el mensaje con 'Deseas conversar sobre lo que te está pasando?' si encaja con el contexto.`;
+    const prompt = `Eres un experto en comunicación con adolescentes, psicología y pedagogía. 
+    En los últimos días, el usuario se sintió ${moodList} con las siguientes emociones ${emotionList} 
+    y en los siguientes lugares ${placeList}. Elabora un resumen breve (1-2 frases) sobre el estado 
+    de ánimo en los últimos días con esa información para presentarle al usuario. El mensaje debe 
+    ser amistoso, empático, en segunda persona y adaptado a un adolescente.`;
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 50,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
-          'Content-Type': 'application/json',
+    console.log('Enviando solicitud a OpenAI con prompt:', prompt);
+
+    try {
+      const openaiResponse = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 150,
+          temperature: 0.7
         },
-      }
-    );
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-    let analysis = response.data.choices[0].message.content.trim();
-    if (!analysis.endsWith('Deseas conversar sobre lo que te está pasando?')) {
-      analysis += ' Deseas conversar sobre lo que te está pasando?';
+      console.log('Respuesta de OpenAI recibida:', openaiResponse.data);
+
+      let analysis = openaiResponse.data.choices[0].message.content.trim();
+      if (!analysis.endsWith('?')) {
+        analysis += ' ¿Te gustaría conversar sobre cómo te sientes?';
+      }
+
+      return res.json({ analysis });
+
+    } catch (openaiError) {
+      console.error('Error en la llamada a OpenAI:', openaiError.response?.data || openaiError.message);
+      throw new Error('Error al comunicarse con OpenAI: ' + (openaiError.response?.data?.error?.message || openaiError.message));
     }
 
-    res.json({ analysis });
   } catch (error) {
-    res.status(500).json({ message: 'Error al analizar emociones', error: error.response?.data || error.message });
+    console.error('Error completo en /api/analyze-emotions:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Error al analizar emociones',
+      error: error.message
+    });
   }
 });
+
+// Agregar después de los otros endpoints, antes de app.listen
 
 app.post('/api/chatbot', authenticateToken, async (req, res) => {
   try {
     const { message } = req.body;
-    const response = await axios.post(
+    console.log('Mensaje recibido en chatbot:', message);
+
+    if (!message) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'El mensaje es requerido' 
+      });
+    }
+
+    const prompt = `Eres un asistente amigable y empático, especializado en hablar con adolescentes. 
+    Responde al siguiente mensaje del usuario de forma comprensiva y cercana: "${message}"`;
+
+    const openaiResponse = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'Eres un chatbot empático que ayuda con el bienestar emocional en español.' },
-          { role: 'user', content: message },
-        ],
+        messages: [{ role: 'user', content: prompt }],
         max_tokens: 150,
+        temperature: 0.7
       },
       {
         headers: {
@@ -242,10 +315,44 @@ app.post('/api/chatbot', authenticateToken, async (req, res) => {
       }
     );
 
-    const botResponse = response.data.choices[0].message.content.trim();
-    res.json({ response: botResponse });
+    console.log('Respuesta de OpenAI recibida para chatbot');
+    const botResponse = openaiResponse.data.choices[0].message.content.trim();
+
+    // Crear y guardar la conversación con el formato correcto
+    const conversation = new ChatConversation({
+      userId: new mongoose.Types.ObjectId(req.user.id),
+      messages: [
+        {
+          content: message,
+          sender: 'user',
+          timestamp: new Date()
+        },
+        {
+          content: botResponse,
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ]
+    });
+
+    await conversation.save();
+    console.log('Conversación guardada exitosamente');
+
+    return res.json({ 
+      success: true,
+      response: botResponse 
+    });
+
   } catch (error) {
-    res.status(500).json({ message: 'Error al conectar con el chatbot', error: error.response?.data || error.message });
+    console.error('Error en chatbot:', error);
+    if (error.response?.data) {
+      console.error('Detalles del error de OpenAI:', error.response.data);
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Error al procesar mensaje',
+      error: error.message
+    });
   }
 });
 

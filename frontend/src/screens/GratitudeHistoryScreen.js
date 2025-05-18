@@ -13,7 +13,7 @@ const GratitudeHistoryScreen = ({ navigation }) => {
   const fetchGratitudeEntries = async () => {
     try {
       setIsLoading(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         Alert.alert('Error', 'Por favor, inicia sesión nuevamente');
         navigation.navigate('SignIn');

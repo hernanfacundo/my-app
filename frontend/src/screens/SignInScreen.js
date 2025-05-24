@@ -1,8 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';  // <- Asegúrate de que la ruta sea correcta
 import globalStyles from '../screens/globalStyles';
 import theme from '../screens/theme';
 import config from '../config';
@@ -10,18 +10,21 @@ import config from '../config';
 const SignInScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useContext(AuthContext);
+  const { login } = useAuth();
 
   const handleSignIn = async () => {
     try {
+      console.log('Iniciando proceso de login...');
       const response = await axios.post(`${config.API_BASE_URL}/auth/signin`, { email, password });
       const { token } = response.data;
-      await AsyncStorage.setItem('userToken', token); // Usa 'userToken'
-      await login(token);
-      navigation.navigate('Dashboard');
+      
+      console.log('Token recibido del servidor:', token);
+      await login(token); // Solo llamamos a login, que manejará todo
+      
+      console.log('Login completado en SignInScreen');
     } catch (error) {
+      console.error('Error en login:', error);
       Alert.alert('Error', 'No se pudo iniciar sesión. Verifica tus credenciales.');
-      console.error('Error al iniciar sesión:', error);
     }
   };
 
@@ -45,11 +48,20 @@ const SignInScreen = ({ navigation }) => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-        <Text style={styles.buttonText}>Iniciar Sesión</Text>
+      <TouchableOpacity
+        style={[globalStyles.button]}
+        onPress={handleSignIn}
+      >
+        <Text style={globalStyles.buttonText}>Iniciar Sesión</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-        <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
+
+      <TouchableOpacity
+        style={[globalStyles.button, globalStyles.buttonSecondary]}
+        onPress={() => navigation.navigate('SignUp')}
+      >
+        <Text style={[globalStyles.buttonText, globalStyles.buttonSecondaryText]}>
+          Registrarse
+        </Text>
       </TouchableOpacity>
     </View>
   );

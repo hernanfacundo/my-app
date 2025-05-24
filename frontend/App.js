@@ -1,53 +1,105 @@
-import React, { useContext, useEffect } from 'react';
+// App.js
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import SignInScreen from './src/screens/SignInScreen';
-import SignUpScreen from './src/screens/SignUpScreen';
+
+// Contexto de autenticación
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+
+// Pantallas públicas
+import SignInScreen    from './src/screens/SignInScreen';
+import SignUpScreen    from './src/screens/SignUpScreen';
+
+// Pantalla principal
 import DashboardScreen from './src/screens/DashboardScreen';
-import MoodStartScreen from './src/screens/MoodStartScreen';
-import EmotionSelectionScreen from './src/screens/EmotionSelectionScreen';
-import PlaceSelectionScreen from './src/screens/PlaceSelectionScreen';
-import CommentScreen from './src/screens/CommentScreen';
-import MoodHistoryScreen from './src/screens/MoodHistoryScreen';
-import GratitudeEntryScreen from './src/screens/GratitudeEntryScreen';
-import GratitudeHistoryScreen from './src/screens/GratitudeHistoryScreen';
+
+// Funcionalidades de clases
+import ClassListScreen from './src/screens/ClassListScreen';
+import JoinClassScreen from './src/screens/JoinClassScreen';
+
+// Mood & Gratitud
+import EmotionSelection from './src/screens/EmotionSelectionScreen';
+import MoodHistory      from './src/screens/MoodHistoryScreen';
+import GratitudeEntry   from './src/screens/GratitudeEntryScreen';
+import GratitudeHistory from './src/screens/GratitudeHistoryScreen';
+
+// Rutas de aprendizaje
+import LearningPaths      from './src/screens/LearningPathsScreen';
+import LearningPathDetail from './src/screens/LearningPathDetailScreen';
+
+// Chatbot
 import ChatbotScreen from './src/screens/ChatbotScreen';
-import LearningPathsScreen from './src/screens/LearningPathsScreen';
-import LearningPathDetailScreen from './src/screens/LearningPathDetailScreen';
-import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import CreateClassScreen from './src/screens/CreateClassScreen';
 
 const Stack = createNativeStackNavigator();
 
-const App = () => {
-  const { user } = useContext(AuthContext) || {}; // Evita el error si AuthContext no está definido
-
-  useEffect(() => {
-    if (user && user.id) {
-      // Aquí podrías agregar lógica para redirigir según el rol en el futuro
-    }
-  }, [user]);
+function AppNavigator() {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return null; // o un componente de carga
+  }
 
   return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{ headerShown: false }}
+      >
+        {!user ? (
+          // Stack de autenticación
+          <>
+            <Stack.Screen 
+              name="SignIn" 
+              component={SignInScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="SignUp" 
+              component={SignUpScreen} 
+              options={{ headerShown: false }}
+            />
+          </>
+        ) : (
+          // Stack principal
+          <>
+            <Stack.Screen 
+              name="Dashboard" 
+              component={DashboardScreen} 
+              options={{ headerShown: false }}
+            />
+
+            {/* Clases */}
+            <Stack.Screen name="ClassList" component={ClassListScreen} />
+            <Stack.Screen name="JoinClass" component={JoinClassScreen} />
+            <Stack.Screen name="CreateClass" component={CreateClassScreen} />
+
+            {/* Estados de ánimo */}
+            <Stack.Screen name="EmotionSelection" component={EmotionSelection} />
+            <Stack.Screen name="MoodHistory"      component={MoodHistory} />
+
+            {/* Gratitud */}
+            <Stack.Screen name="GratitudeEntry"   component={GratitudeEntry} />
+            <Stack.Screen name="GratitudeHistory" component={GratitudeHistory} />
+
+            {/* Rutas de aprendizaje */}
+            <Stack.Screen name="LearningPaths"      component={LearningPaths} />
+            <Stack.Screen name="LearningPathDetail" component={LearningPathDetail} />
+
+            {/* Chatbot */}
+            <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+            
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// App solo se encarga de envolver con AuthProvider
+export default function App() {
+  return (
     <AuthProvider>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName={user && user.id ? 'Dashboard' : 'SignIn'}>
-          <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="SignUp" component={SignUpScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="MoodStart" component={MoodStartScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="EmotionSelection" component={EmotionSelectionScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="PlaceSelection" component={PlaceSelectionScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Comment" component={CommentScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="MoodHistory" component={MoodHistoryScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="GratitudeEntry" component={GratitudeEntryScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="GratitudeHistory" component={GratitudeHistoryScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Chatbot" component={ChatbotScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="LearningPaths" component={LearningPathsScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="LearningPathDetail" component={LearningPathDetailScreen} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <AppNavigator />
     </AuthProvider>
   );
-};
-
-export default App;
+}

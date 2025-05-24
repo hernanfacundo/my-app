@@ -1,4 +1,5 @@
 require('dotenv').config();
+//require('dns').setDefaultResultOrder('ipv4first'); // <— nuevo
 console.log('JWT_SECRET:', process.env.JWT_SECRET);
 const express = require('express');
 const cors = require('cors'); // <-- Agrega esta línea
@@ -12,6 +13,9 @@ const ChatConversation = require('./models/ChatConversation');
 const User = require('./models/User');
 const LearningPath = require('./models/LearningPath');
 const GratitudeEntry = require('./models/GratitudeEntry');
+const Class      = require('./models/Class');
+const Membership = require('./models/Membership');
+
 
 const app = express();
 app.use(cors()); // <-- Aplica CORS a todas las rutas
@@ -20,7 +24,6 @@ app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Conectado a MongoDB'))
   .catch(err => console.error('Error conectando a MongoDB:', err));
-
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -414,6 +417,88 @@ app.post('/api/chat-conversations', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Error al guardar conversación', error });
   }
 });
+
+// Crear una nueva clase
+app.post('/api/classes', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ message: 'El nombre es requerido' });
+
+    // Generar código único (6 caracteres alfanuméricos)
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const newClass = new Class({
+      name,
+      code,
+      docenteId: req.user.id
+    });
+    await newClass.save();
+    return res.status(201).json(newClass);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al crear clase' });
+  }
+});
+
+// Listar clases propias (docente)
+app.get('/api/classes', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+    const classes = await Class.find({ docenteId: req.user.id });
+    return res.json(classes);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al obtener clases' });
+  }
+});
+
+// Alumno ingresa código para unirse
+app.post('/api/classes/:code/join', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Solo alumnos pueden unirse' });
+    }
+    const cls = await Class.findOne({ code: req.params.code });
+    if (!cls) {
+      return res.status(404).json({ message: 'Código de clase inválido' });
+    }
+    // Crear la pertenencia (o ignorar si ya existe)
+    const membership = new Membership({
+      classId: cls._id,
+      alumnoId: req.user.id
+    });
+    await membership.save();
+    return res.json({ message: 'Te uniste a la clase', class: cls });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Ya estás en esta clase' });
+    }
+    console.error(err);
+    return res.status(500).json({ message: 'Error al unirse a la clase' });
+  }
+});
+
+// Listar clases a las que el alumno está inscrito
+app.get('/api/classes/joined', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+    const memberships = await Membership.find({ alumnoId: req.user.id })
+      .populate('classId');
+    const classes = memberships.map(m => m.classId);
+    return res.json(classes);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al obtener tus clases' });
+  }
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));

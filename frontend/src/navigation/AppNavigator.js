@@ -13,6 +13,10 @@ import LearningPathDetailScreen from '../screens/LearningPathDetailScreen';
 import GratitudeEntryScreen from '../screens/GratitudeEntryScreen';
 import GratitudeHistoryScreen from '../screens/GratitudeHistoryScreen';
 import ChatbotScreen from '../screens/ChatbotScreen';
+import ClassListScreen from '../screens/ClassListScreen';
+import JoinClassScreen from '../screens/JoinClassScreen';
+import CreateClassScreen from '../screens/CreateClassScreen';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +34,9 @@ const screens = [
   { name: 'GratitudeEntry', component: GratitudeEntryScreen },
   { name: 'GratitudeHistory', component: GratitudeHistoryScreen },
   { name: 'Chatbot', component: ChatbotScreen },
+  { name: 'ClassList', component: ClassListScreen },
+  { name: 'JoinClass', component: JoinClassScreen },
+  { name: 'CreateClass', component: CreateClassScreen },
 ];
 
 const validScreens = screens.filter(({ component, name }) => {

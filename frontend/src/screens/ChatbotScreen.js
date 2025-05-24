@@ -72,10 +72,17 @@ const ChatbotScreen = ({ navigation, route }) => {
   const saveConversation = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const userId = decodeToken(token).id; // Usamos la misma función de decodificación
+      const userId = decodeToken(token).id;
       await axios.post(
         `${config.API_BASE_URL}/chat-conversations`,
-        { userId, messages: messages.map(m => m.text) },
+        { 
+          userId, 
+          messages: messages.map(m => ({
+            content: m.text,
+            sender: m.sender,
+            timestamp: new Date()
+          }))
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       Alert.alert('Éxito', 'Conversación guardada para estadísticas');

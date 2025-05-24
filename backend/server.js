@@ -127,8 +127,30 @@ app.post('/api/moods', authenticateToken, async (req, res) => {
       createdAt: new Date()
     });
 
+    // Validar que los valores estén en los enums permitidos
+    const validMoods = ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Enojado', 'Excelente'];
+    const validEmotions = [
+      'Feliz', 'Entusiasmado', 'Alegre', 'Contento', 'Satisfecho',
+      'Optimista', 'Tranquilo', 'Neutral', 'Relajado', 'Confundido',
+      'Inseguro', 'Cansado', 'Triste', 'Ansioso', 'Enojado'
+    ];
+    const validPlaces = [
+      'Casa', 'Trabajo', 'Parque', 'Escuela', 'Gimnasio',
+      'Calle', 'Café', 'Biblioteca', 'Tienda', 'Otro'
+    ];
+
+    if (!validMoods.includes(mood)) {
+      return res.status(400).json({ message: 'Estado de ánimo no válido' });
+    }
+    if (!validEmotions.includes(emotion)) {
+      return res.status(400).json({ message: 'Emoción no válida' });
+    }
+    if (!validPlaces.includes(place)) {
+      return res.status(400).json({ message: 'Lugar no válido' });
+    }
+
     const newMood = new Mood({
-      userId: req.user.id,  // Cambiamos esta línea para usar directamente el id
+      userId: req.user.id,
       mood,
       emotion,
       place,
@@ -140,7 +162,46 @@ app.post('/api/moods', authenticateToken, async (req, res) => {
     const savedMood = await newMood.save();
     console.log('Mood guardado exitosamente:', savedMood);
     
-    res.status(201).json({ message: 'Mood guardado', data: savedMood });
+    // Intentar analizar emociones, pero no fallar si no se puede
+    let analysis = null;
+    try {
+      if (process.env.CHATGPT_API_KEY) {
+        const response = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'Eres un asistente emocional empático para adolescentes.' },
+              { 
+                role: 'user', 
+                content: `El usuario se siente ${mood} y ${emotion} mientras está en ${place}. ¿Podrías darle un mensaje breve y empático?` 
+              }
+            ],
+            max_tokens: 150,
+            temperature: 0.7
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        analysis = response.data.choices[0].message.content.trim();
+      } else {
+        console.log('No se encontró CHATGPT_API_KEY en las variables de entorno');
+        analysis = '¡Gracias por compartir cómo te sientes! ¿Te gustaría conversar sobre ello?';
+      }
+    } catch (analyzeError) {
+      console.error('Error al analizar emociones (no crítico):', analyzeError);
+      analysis = '¡Gracias por compartir cómo te sientes! ¿Te gustaría conversar sobre ello?';
+    }
+    
+    res.status(201).json({ 
+      message: 'Mood guardado', 
+      data: savedMood,
+      analysis 
+    });
   } catch (error) {
     console.error('Error detallado al guardar mood:', error);
     console.error('Stack trace:', error.stack);
@@ -212,7 +273,7 @@ app.post('/api/gratitude', authenticateToken, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5);
     const summary = recent
-      .map(g => `El ${g.date.toLocaleDateString()}: “${g.text}”`)
+      .map(g => `El ${g.date.toLocaleDateString()}: " ${g.text} "`)
       .reverse()
       .join('\n');
 
@@ -226,7 +287,7 @@ Tu tarea: después de cada entrada de gratitud,
 
 Historial reciente:
 ${summary}
-Usuario acaba de decir: “${text}”
+Usuario acaba de decir: " ${text} "
 `;
 
     // Llamada a OpenAI
@@ -288,9 +349,9 @@ app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
     Tu misión es:
     1. Reflejar lo que el usuario expresa.
     2. Formular siempre preguntas abiertas para invitarlo a profundizar:
-          “¿Qué significa eso para ti?”
-          “¿Cómo viviste esa experiencia?”
-          “¿Qué crees que desencadenó esa emoción?”
+          "¿Qué significa eso para ti?"
+          "¿Cómo viviste esa experiencia?"
+          "¿Qué crees que desencadenó esa emoción?"
     3. Mantener un tono cálido y curioso, ofreciendo confianza y seguridad.
     En los últimos días, el usuario se sintió ${moodList} con las siguientes emociones ${emotionList} 
     y en los siguientes lugares ${placeList}. Elabora un resumen breve (1-2 frases) sobre el estado 
@@ -299,43 +360,47 @@ app.post('/api/analyze-emotions', authenticateToken, async (req, res) => {
 
     console.log('Enviando solicitud a OpenAI con prompt:', prompt);
 
-    try {
-      const openaiResponse = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.7
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      console.log('Respuesta de OpenAI recibida:', openaiResponse.data);
-
-      let analysis = openaiResponse.data.choices[0].message.content.trim();
-      if (!analysis.endsWith('?')) {
-        analysis += ' ¿Te gustaría conversar sobre cómo te sientes?';
-      }
-
-      return res.json({ analysis });
-
-    } catch (openaiError) {
-      console.error('Error en la llamada a OpenAI:', openaiError.response?.data || openaiError.message);
-      throw new Error('Error al comunicarse con OpenAI: ' + (openaiError.response?.data?.error?.message || openaiError.message));
+    if (!process.env.CHATGPT_API_KEY) {
+      console.log('No se encontró CHATGPT_API_KEY en las variables de entorno');
+      return res.json({ 
+        analysis: "¡Gracias por compartir tus emociones! Me encantaría saber más sobre cómo te sientes. ¿Te gustaría conversar sobre ello?" 
+      });
     }
+
+    const openaiResponse = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'Eres un asistente emocional empático para adolescentes.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 150,
+        temperature: 0.7
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!openaiResponse.data || !openaiResponse.data.choices || !openaiResponse.data.choices[0] || !openaiResponse.data.choices[0].message) {
+      throw new Error('Respuesta inválida de OpenAI');
+    }
+
+    let analysis = openaiResponse.data.choices[0].message.content.trim();
+    if (!analysis.endsWith('?')) {
+      analysis += ' ¿Te gustaría conversar sobre cómo te sientes?';
+    }
+
+    return res.json({ analysis });
 
   } catch (error) {
     console.error('Error completo en /api/analyze-emotions:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: 'Error al analizar emociones',
-      error: error.message
+    return res.status(200).json({ 
+      analysis: "¡Gracias por compartir tus emociones! Me encantaría saber más sobre cómo te sientes. ¿Te gustaría conversar sobre ello?"
     });
   }
 });
@@ -410,11 +475,45 @@ return res.json({ success:true, response: botText });
 app.post('/api/chat-conversations', authenticateToken, async (req, res) => {
   try {
     const { userId, messages } = req.body;
-    const newConversation = new ChatConversation({ userId, messages });
+    
+    // Validar que messages sea un array
+    if (!Array.isArray(messages)) {
+      return res.status(400).json({ 
+        message: 'El campo messages debe ser un array' 
+      });
+    }
+
+    // Validar la estructura de cada mensaje
+    const validMessages = messages.every(msg => 
+      msg.content && 
+      typeof msg.content === 'string' &&
+      msg.sender && 
+      ['user', 'bot'].includes(msg.sender) &&
+      msg.timestamp
+    );
+
+    if (!validMessages) {
+      return res.status(400).json({ 
+        message: 'Formato de mensajes inválido. Cada mensaje debe tener content (string), sender (user|bot) y timestamp' 
+      });
+    }
+
+    const newConversation = new ChatConversation({ 
+      userId: req.user.id, // Usar el ID del token en lugar del enviado
+      messages 
+    });
+    
     await newConversation.save();
-    res.status(201).json({ message: 'Conversación guardada', data: newConversation });
+    res.status(201).json({ 
+      message: 'Conversación guardada', 
+      data: newConversation 
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error al guardar conversación', error });
+    console.error('Error al guardar conversación:', error);
+    res.status(500).json({ 
+      message: 'Error al guardar conversación', 
+      error: error.message 
+    });
   }
 });
 

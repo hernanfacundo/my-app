@@ -27,37 +27,65 @@ router.get('/places', authMiddleware, async (req, res) => {
   }
 });
 
-// Crear un nuevo registro de estado de ánimo (movido de server.js)
+// Crear un nuevo registro de estado de ánimo
 router.post('/moods', authMiddleware, async (req, res) => {
-  const { mood, emotion, place, comment } = req.body;
-  const validMoods = ['Excelente', 'Muy bien', 'Bien', 'Más o menos', 'No tan bien'];
-
-  if (!validMoods.includes(mood)) {
-    return res.status(400).json({ message: 'Estado de ánimo inválido' });
-  }
-
   try {
+    const { mood, emotion, place, comment } = req.body;
+    
+    // Validar que todos los campos requeridos estén presentes
+    if (!mood || !emotion || !place) {
+      return res.status(400).json({ 
+        message: 'Mood, emoción y lugar son requeridos',
+        receivedData: { mood, emotion, place }
+      });
+    }
+
+    // Crear nueva entrada
     const moodEntry = new MoodEntry({
       user: req.user.id,
       mood,
       emotion,
       place,
-      comment,
+      comment: comment || '',
     });
-    await moodEntry.save();
-    res.status(201).json({ message: 'Estado de ánimo guardado', data: moodEntry });
+
+    // Guardar en la base de datos
+    const savedEntry = await moodEntry.save();
+    
+    res.status(201).json({ 
+      message: 'Estado de ánimo guardado exitosamente', 
+      data: savedEntry 
+    });
+    
   } catch (error) {
-    res.status(500).json({ message: 'Error al guardar el estado de ánimo', error });
+    console.error('Error al guardar el estado de ánimo:', error);
+    // Si es un error de validación de mongoose, enviar mensaje más específico
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Error de validación', 
+        errors: Object.values(error.errors).map(err => err.message)
+      });
+    }
+    res.status(500).json({ 
+      message: 'Error al guardar el estado de ánimo',
+      error: error.message 
+    });
   }
 });
 
-// Obtener historial de estados de ánimo (movido de server.js)
+// Obtener historial de estados de ánimo
 router.get('/moods', authMiddleware, async (req, res) => {
   try {
-    const moods = await MoodEntry.find({ user: req.user.id }).sort({ date: -1 });
+    const moods = await MoodEntry.find({ user: req.user.id })
+      .sort({ date: -1 })
+      .limit(50);
     res.json({ data: moods });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener el historial', error });
+    console.error('Error al obtener el historial:', error);
+    res.status(500).json({ 
+      message: 'Error al obtener el historial', 
+      error: error.message 
+    });
   }
 });
 

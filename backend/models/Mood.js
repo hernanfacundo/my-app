@@ -9,15 +9,25 @@ const moodSchema = new Schema({
   },
   mood: {
     type: String,
-    required: true
+    required: true,
+    enum: ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Enojado', 'Excelente']
   },
   emotion: {
     type: String,
-    required: true
+    required: true,
+    enum: [
+      'Feliz', 'Entusiasmado', 'Alegre', 'Contento', 'Satisfecho',
+      'Optimista', 'Tranquilo', 'Neutral', 'Relajado', 'Confundido',
+      'Inseguro', 'Cansado', 'Triste', 'Ansioso', 'Enojado'
+    ]
   },
   place: {
     type: String,
-    required: true
+    required: true,
+    enum: [
+      'Casa', 'Trabajo', 'Parque', 'Escuela', 'Gimnasio',
+      'Calle', 'Café', 'Biblioteca', 'Tienda', 'Otro'
+    ]
   },
   comment: {
     type: String,

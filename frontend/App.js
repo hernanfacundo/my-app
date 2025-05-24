@@ -19,6 +19,8 @@ import JoinClassScreen from './src/screens/JoinClassScreen';
 
 // Mood & Gratitud
 import EmotionSelection from './src/screens/EmotionSelectionScreen';
+import PlaceSelection from './src/screens/PlaceSelectionScreen';
+import CommentScreen from './src/screens/CommentScreen';
 import MoodHistory      from './src/screens/MoodHistoryScreen';
 import GratitudeEntry   from './src/screens/GratitudeEntryScreen';
 import GratitudeHistory from './src/screens/GratitudeHistoryScreen';
@@ -75,14 +77,16 @@ function AppNavigator() {
 
             {/* Estados de ánimo */}
             <Stack.Screen name="EmotionSelection" component={EmotionSelection} />
-            <Stack.Screen name="MoodHistory"      component={MoodHistory} />
+            <Stack.Screen name="PlaceSelection" component={PlaceSelection} />
+            <Stack.Screen name="Comment" component={CommentScreen} />
+            <Stack.Screen name="MoodHistory" component={MoodHistory} />
 
             {/* Gratitud */}
-            <Stack.Screen name="GratitudeEntry"   component={GratitudeEntry} />
+            <Stack.Screen name="GratitudeEntry" component={GratitudeEntry} />
             <Stack.Screen name="GratitudeHistory" component={GratitudeHistory} />
 
             {/* Rutas de aprendizaje */}
-            <Stack.Screen name="LearningPaths"      component={LearningPaths} />
+            <Stack.Screen name="LearningPaths" component={LearningPaths} />
             <Stack.Screen name="LearningPathDetail" component={LearningPathDetail} />
 
             {/* Chatbot */}

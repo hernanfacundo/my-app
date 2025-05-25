@@ -2,28 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av'; // Corrige la importación: expo-audio no es correcto, debería ser expo-av
-import theme from './theme';
+import modernTheme from './modernTheme';
 import globalStyles from './globalStyles';
 import config from '../config';
 
-// Componente CustomButton incluido directamente
-const CustomButton = ({ title, onPress, disabled }) => {
-  return (
-    <TouchableOpacity
-      style={[styles.button, disabled && styles.disabledButton]}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      <Text style={styles.buttonText}>{title}</Text>
-    </TouchableOpacity>
-  );
-};
-
 const LearningPathsScreen = ({ navigation }) => {
   const [learningPaths, setLearningPaths] = useState([]);
-  const [sound, setSound] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
 
   // Depurar si navigation está disponible
   useEffect(() => {
@@ -63,77 +47,72 @@ const LearningPathsScreen = ({ navigation }) => {
     fetchLearningPaths();
   }, []);
 
-  // Gestión de audio
-  async function loadAndPlaySound() {
-    try {
-      console.log('Cargando audio...');
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://example.com/learning-audio.mp3' } // Reemplaza con tu URL de audio válida
-      );
-      setSound(sound);
-      await sound.playAsync();
-      setIsPlaying(true);
-      console.log('Audio reproduciéndose...');
+  // Función para obtener color único por índice
+  const getPathCardColor = (index) => {
+    const colors = [
+      modernTheme.colors.turquoise,
+      modernTheme.colors.coral,
+      modernTheme.colors.pastelYellow,
+      modernTheme.colors.lavender,
+      '#A8E6CF',
+      '#FFB3B3',
+    ];
+    return colors[index % colors.length];
+  };
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-          sound.unloadAsync();
-          setSound(null);
-        }
-      });
-    } catch (error) {
-      console.error('Error al reproducir audio:', error);
-      Alert.alert('Error', 'No se pudo reproducir el audio');
-    }
-  }
-
-  async function stopSound() {
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
-      setIsPlaying(false);
-      console.log('Audio detenido.');
-    }
-  }
-
-  useEffect(() => {
-    return sound
-      ? () => {
-          sound.unloadAsync();
-        }
-      : undefined;
-  }, [sound]);
+  // Función para obtener icono temático
+  const getPathIcon = (index) => {
+    const icons = ['🧘', '💪', '🎨', '📚', '🌱', '⭐', '🎯', '🚀'];
+    return icons[index % icons.length];
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={globalStyles.title}>Rutas de Aprendizaje</Text>
+      {/* Header moderno */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.mainTitle}>🚀 Rutas de Aprendizaje</Text>
+        <Text style={styles.subtitle}>
+          Descubre caminos personalizados para tu crecimiento
+        </Text>
+      </View>
+
       <FlatList
         data={learningPaths}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <TouchableOpacity
-            style={styles.pathCard}
+            style={[
+              styles.modernPathCard,
+              { borderLeftColor: getPathCardColor(index) }
+            ]}
             onPress={() => navigation.navigate('LearningPathDetail', { path: item })}
           >
-            <Text style={styles.pathTitle}>{item.title}</Text>
-            <Text style={globalStyles.secondaryText}>{item.description}</Text>
+            <View style={styles.pathCardHeader}>
+              <View style={[styles.pathIconContainer, { backgroundColor: getPathCardColor(index) }]}>
+                <Text style={styles.pathIcon}>{getPathIcon(index)}</Text>
+              </View>
+              <View style={styles.pathCardContent}>
+                <Text style={styles.modernPathTitle}>{item.title}</Text>
+                <Text style={styles.modernPathDescription}>{item.description}</Text>
+              </View>
+              <View style={styles.pathArrow}>
+                <Text style={styles.pathArrowText}>→</Text>
+              </View>
+            </View>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No hay caminos de aprendizaje disponibles</Text>}
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>📚</Text>
+            <Text style={styles.emptyTitle}>¡Próximamente nuevas rutas!</Text>
+            <Text style={styles.emptyText}>
+              Estamos preparando contenido increíble para tu crecimiento personal
+            </Text>
+          </View>
+        }
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
       />
-      <View style={styles.buttonContainer}>
-        <CustomButton
-          title={isPlaying ? 'Detener' : 'Reproducir Audio'}
-          onPress={isPlaying ? stopSound : loadAndPlaySound}
-          disabled={!learningPaths.length} // Deshabilita el botón si no hay learning paths
-        />
-      </View>
-      <Text style={styles.instructions}>
-        Escucha esta guía para comenzar tu camino de aprendizaje.
-      </Text>
     </View>
   );
 };
@@ -141,60 +120,92 @@ const LearningPathsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primaryBackground,
-    padding: theme.spacing.padding,
+    backgroundColor: modernTheme.colors.primaryBackground,
+    padding: modernTheme.spacing.padding,
   },
-  listContent: {
-    paddingBottom: theme.spacing.padding,
+  headerContainer: {
+    marginBottom: modernTheme.spacing.marginMedium,
   },
-  buttonContainer: {
-    marginVertical: theme.spacing.marginMedium,
+  mainTitle: {
+    fontSize: modernTheme.fontSizes.title,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
   },
-  pathCard: {
-    backgroundColor: theme.colors.chartBackground,
-    padding: theme.spacing.padding,
+  subtitle: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+  },
+  listContainer: {
+    paddingBottom: modernTheme.spacing.padding,
+  },
+  modernPathCard: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    padding: modernTheme.spacing.padding,
     borderRadius: 10,
-    marginBottom: theme.spacing.marginMedium,
+    marginBottom: modernTheme.spacing.marginMedium,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    borderLeftWidth: 4,
   },
-  pathTitle: {
-    fontSize: theme.fontSizes.subtitle,
+  pathCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pathIconContainer: {
+    padding: modernTheme.spacing.padding,
+    borderRadius: 10,
+  },
+  pathIcon: {
+    fontSize: 20,
+  },
+  pathCardContent: {
+    flex: 1,
+    marginLeft: modernTheme.spacing.marginMedium,
+  },
+  modernPathTitle: {
+    fontSize: modernTheme.fontSizes.subtitle,
     fontWeight: '600',
-    color: theme.colors.primaryText,
-    marginBottom: theme.spacing.marginSmall,
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  modernPathDescription: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+  },
+  pathArrow: {
+    padding: modernTheme.spacing.paddingSmall,
+  },
+  pathArrowText: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.turquoise,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: modernTheme.spacing.paddingLarge,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  emptyTitle: {
+    fontSize: modernTheme.fontSizes.title,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+    textAlign: 'center',
   },
   emptyText: {
-    fontSize: theme.fontSizes.body,
-    color: theme.colors.secondaryText,
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
     textAlign: 'center',
-    marginVertical: theme.spacing.marginMedium,
-  },
-  button: {
-    backgroundColor: theme.colors.accent,
-    padding: theme.spacing.padding,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: theme.spacing.marginSmall,
-    width: '90%',
-  },
-  disabledButton: {
-    backgroundColor: theme.colors.secondaryBackground, // Color deshabilitado
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: theme.colors.chartBackground,
-    fontSize: theme.fontSizes.label,
-    fontWeight: '500',
-  },
-  instructions: {
-    fontSize: theme.fontSizes.body,
-    color: theme.colors.secondaryText,
-    textAlign: 'center',
-    marginTop: theme.spacing.marginSmall,
+    paddingHorizontal: modernTheme.spacing.paddingLarge,
   },
 });
 

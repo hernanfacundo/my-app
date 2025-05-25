@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import globalStyles from '../screens/globalStyles';
-import theme from '../screens/theme';
+import modernTheme from '../screens/modernTheme';
 import config from '../config';
 
 const EmotionSelectionScreen = ({ route, navigation }) => {
@@ -12,72 +12,152 @@ const EmotionSelectionScreen = ({ route, navigation }) => {
     console.log('Mood recibido en EmotionSelectionScreen:', mood);
   }, [mood]);
 
+  // Emociones con iconos y colores únicos
   const emotions = [
-    'Feliz',
-    'Entusiasmado',
-    'Alegre',
-    'Contento',
-    'Satisfecho',
-    'Optimista',
-    'Tranquilo',
-    'Neutral',
-    'Relajado',
-    'Confundido',
-    'Inseguro',
-    'Cansado',
-    'Triste',
-    'Ansioso',
-    'Enojado',
+    { name: 'Feliz', emoji: '😊', color: modernTheme.colors.turquoise },
+    { name: 'Entusiasmado', emoji: '🤩', color: modernTheme.colors.coral },
+    { name: 'Alegre', emoji: '😄', color: modernTheme.colors.pastelYellow },
+    { name: 'Contento', emoji: '😌', color: modernTheme.colors.lavender },
+    { name: 'Satisfecho', emoji: '😇', color: '#A8E6CF' },
+    { name: 'Optimista', emoji: '🌟', color: modernTheme.colors.turquoise },
+    { name: 'Tranquilo', emoji: '😊', color: modernTheme.colors.lavender },
+    { name: 'Neutral', emoji: '😐', color: '#B0B0B0' },
+    { name: 'Relajado', emoji: '😌', color: '#A8E6CF' },
+    { name: 'Confundido', emoji: '😕', color: modernTheme.colors.pastelYellow },
+    { name: 'Inseguro', emoji: '😰', color: '#FFB3B3' },
+    { name: 'Cansado', emoji: '😴', color: modernTheme.colors.lavender },
+    { name: 'Triste', emoji: '😢', color: '#B0B0B0' },
+    { name: 'Ansioso', emoji: '😟', color: '#FFB3B3' },
+    { name: 'Enojado', emoji: '😠', color: modernTheme.colors.coral },
   ];
 
   if (!emotions.length) {
     Alert.alert('Error', 'No se pudieron cargar las emociones.');
     return (
-      <View style={globalStyles.container}>
-        <Text style={globalStyles.title}>Error al cargar las emociones</Text>
+      <View style={styles.container}>
+        <Text style={styles.errorTitle}>Error al cargar las emociones</Text>
       </View>
     );
   }
 
   return (
-    <View style={globalStyles.container}>
-      <Text style={globalStyles.title}>Selecciona una emoción específica</Text>
-      <View style={styles.emotionContainer}>
-        {emotions.map((emotion) => (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Header moderno */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.mainTitle}>¿Cómo te sientes exactamente?</Text>
+        <Text style={styles.subtitle}>
+          Elegiste "{mood}" - ahora sé más específico 🎯
+        </Text>
+      </View>
+
+      {/* Grid de emociones */}
+      <View style={styles.emotionsGrid}>
+        {emotions.map((emotion, index) => (
           <TouchableOpacity
-            key={emotion}
-            style={styles.emotionButton}
-            onPress={() => navigation.navigate('PlaceSelection', { mood, emotion })}
+            key={emotion.name}
+            style={[
+              styles.emotionCard,
+              { backgroundColor: emotion.color }
+            ]}
+            onPress={() => navigation.navigate('PlaceSelection', { mood, emotion: emotion.name })}
           >
-            <Text style={styles.emotionText}>{emotion}</Text>
+            <View style={styles.emotionIconContainer}>
+              <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+            </View>
+            <Text style={styles.emotionName}>{emotion.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
-    </View>
+
+      {/* Footer motivacional */}
+      <View style={styles.footerContainer}>
+        <Text style={styles.footerText}>
+          💡 Tip: Ser específico te ayuda a entender mejor tus emociones
+        </Text>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  emotionContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: modernTheme.colors.primaryBackground,
+  },
+  contentContainer: {
+    padding: modernTheme.spacing.paddingMedium,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: modernTheme.spacing.marginSmall,
+    paddingVertical: 0,
+  },
+  mainTitle: {
+    fontSize: modernTheme.fontSizes.largeTitle,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    textAlign: 'center',
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  subtitle: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+    paddingHorizontal: modernTheme.spacing.paddingMedium,
+  },
+  emotionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 0,
+  },
+  emotionCard: {
+    width: '22%',
+    aspectRatio: 0.7,
+    borderRadius: modernTheme.borderRadius.small,
+    padding: modernTheme.spacing.paddingSmall,
+    marginBottom: modernTheme.spacing.marginTiny,
+    alignItems: 'center',
     justifyContent: 'center',
+    ...modernTheme.shadows.medium,
   },
-  emotionButton: {
-    backgroundColor: theme.colors.accent,
-    padding: theme.spacing.padding,
-    borderRadius: 10,
-    margin: theme.spacing.marginSmall,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+  emotionIconContainer: {
+    width: 28,
+    height: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: modernTheme.borderRadius.round,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: modernTheme.spacing.marginTiny,
   },
-  emotionText: {
-    color: theme.colors.chartBackground,
-    fontSize: theme.fontSizes.label,
-    fontWeight: '500',
+  emotionEmoji: {
+    fontSize: 18,
+  },
+  emotionName: {
+    fontSize: modernTheme.fontSizes.smallLabel,
+    fontWeight: '600',
+    color: modernTheme.colors.chartBackground,
+    textAlign: 'center',
+  },
+  footerContainer: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.paddingMedium,
+    marginTop: modernTheme.spacing.marginTiny,
+    borderWidth: 1,
+    borderColor: modernTheme.colors.lavender,
+  },
+  footerText: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  errorTitle: {
+    fontSize: modernTheme.fontSizes.title,
+    fontWeight: '700',
+    color: modernTheme.colors.error,
+    textAlign: 'center',
   },
 });
 

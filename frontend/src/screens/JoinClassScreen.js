@@ -6,32 +6,27 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert
+  Alert,
+  ScrollView
 } from 'react-native';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import config from '../config';
-import theme from './theme';
-import globalStyles from './globalStyles';
-
-// Reutilizamos el CustomButton del DashboardScreen
-const CustomButton = ({ title, onPress }) => (
-  <TouchableOpacity style={[globalStyles.button]} onPress={onPress}>
-    <Text style={globalStyles.buttonText}>{title}</Text>
-  </TouchableOpacity>
-);
+import modernTheme from './modernTheme';
 
 const JoinClassScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [classCode, setClassCode] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleJoinClass = async () => {
-    try {
-      if (!classCode.trim()) {
-        Alert.alert('Error', 'Por favor ingresa el código de la clase');
-        return;
-      }
+    if (!classCode.trim()) {
+      Alert.alert('¡Oops! 📝', 'Por favor ingresa el código de la clase para continuar');
+      return;
+    }
 
+    setIsLoading(true);
+    try {
       const response = await axios.post(
         `${config.API_BASE_URL}/classes/${classCode}/join`,
         {},
@@ -41,11 +36,11 @@ const JoinClassScreen = ({ navigation }) => {
       );
 
       Alert.alert(
-        'Éxito',
-        'Te has unido a la clase correctamente',
+        '¡Genial! 🎉',
+        'Te has unido a la clase correctamente. ¡Bienvenido!',
         [
           {
-            text: 'OK',
+            text: 'Ver mis clases',
             onPress: () => navigation.navigate('ClassList')
           }
         ]
@@ -53,124 +48,257 @@ const JoinClassScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error al unirse a la clase:', error);
       let errorMessage = 'No se pudo unir a la clase';
+      let errorEmoji = '😕';
       
       if (error.response) {
         if (error.response.status === 404) {
-          errorMessage = 'El código de clase no existe';
+          errorMessage = 'El código de clase no existe. ¿Verificaste que esté correcto?';
+          errorEmoji = '🔍';
         } else if (error.response.status === 400) {
-          errorMessage = 'Ya estás inscrito en esta clase';
+          errorMessage = 'Ya estás inscrito en esta clase. ¡Qué bueno!';
+          errorEmoji = '✅';
         } else if (error.response.data?.message) {
           errorMessage = error.response.data.message;
         }
       }
       
-      Alert.alert('Error', errorMessage);
+      Alert.alert(`${errorEmoji} Información`, errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <View style={[globalStyles.container, styles.container]}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={[globalStyles.title, styles.welcomeText]}>
-          Unirse a una Clase
-        </Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Header juvenil */}
+      <View style={styles.header}>
+        <Text style={styles.headerEmoji}>🎓</Text>
+        <Text style={styles.title}>¡Únete a una clase!</Text>
+        <Text style={styles.subtitle}>Conecta con tu profesor y compañeros</Text>
       </View>
 
-      {/* Contenido principal */}
-      <View style={styles.contentContainer}>
-        {/* Botón Ver Mis Clases */}
-        <CustomButton
-          title="Ver Mis Clases"
-          onPress={() => navigation.navigate('ClassList')}
-        />
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>¿Cómo unirte a una clase?</Text>
-          <Text style={styles.infoText}>
-            1. Solicita el código a tu profesor{'\n'}
-            2. Ingresa el código en el campo de abajo{'\n'}
-            3. Presiona "Unirme a la Clase"
-          </Text>
+      {/* Botón para ver clases actuales */}
+      <TouchableOpacity
+        style={styles.myClassesButton}
+        onPress={() => navigation.navigate('ClassList')}
+      >
+        <View style={styles.buttonContent}>
+          <Text style={styles.buttonEmoji}>📚</Text>
+          <View style={styles.buttonTextContainer}>
+            <Text style={styles.buttonTitle}>Ver mis clases</Text>
+            <Text style={styles.buttonSubtitle}>Revisa tus clases actuales</Text>
+          </View>
+          <Text style={styles.buttonArrow}>→</Text>
         </View>
+      </TouchableOpacity>
 
+      {/* Tarjeta de instrucciones */}
+      <View style={styles.instructionsCard}>
+        <Text style={styles.instructionsTitle}>📋 ¿Cómo funciona?</Text>
+        <View style={styles.stepContainer}>
+          <View style={styles.step}>
+            <Text style={styles.stepNumber}>1</Text>
+            <Text style={styles.stepText}>Pide el código a tu profesor</Text>
+          </View>
+          <View style={styles.step}>
+            <Text style={styles.stepNumber}>2</Text>
+            <Text style={styles.stepText}>Escríbelo en el campo de abajo</Text>
+          </View>
+          <View style={styles.step}>
+            <Text style={styles.stepNumber}>3</Text>
+            <Text style={styles.stepText}>¡Presiona unirse y listo!</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Formulario de código */}
+      <View style={styles.formContainer}>
+        <Text style={styles.inputLabel}>🔑 Código de la clase</Text>
         <TextInput
-          style={[globalStyles.input, styles.input]}
-          placeholder="Ingresa el código de la clase"
-          placeholderTextColor={theme.colors.secondaryText}
+          style={styles.input}
+          placeholder="Ej: ABC123 o MATE2024"
+          placeholderTextColor={modernTheme.colors.secondaryText}
           value={classCode}
           onChangeText={setClassCode}
-          autoCapitalize="none"
+          autoCapitalize="characters"
           autoCorrect={false}
+          maxLength={10}
         />
-
-        <CustomButton
-          title="Unirme a la Clase"
+        
+        <TouchableOpacity
+          style={[styles.joinButton, isLoading && styles.buttonDisabled]}
           onPress={handleJoinClass}
-        />
+          disabled={isLoading}
+        >
+          <Text style={styles.joinButtonText}>
+            {isLoading ? '⏳ Uniéndome...' : '🚀 ¡Unirme a la clase!'}
+          </Text>
+        </TouchableOpacity>
       </View>
-    </View>
+
+      {/* Footer motivacional */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          💡 Tip: Los códigos de clase suelen tener entre 4-8 caracteres
+        </Text>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.primaryBackground,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.marginLarge,
-  },
-  welcomeText: {
-    textAlign: 'center',
-    marginBottom: theme.spacing.marginMedium,
+    flex: 1,
+    backgroundColor: modernTheme.colors.primaryBackground,
   },
   contentContainer: {
+    flexGrow: 1,
+    paddingHorizontal: modernTheme.spacing.paddingLarge,
+    paddingVertical: modernTheme.spacing.paddingXLarge,
+  },
+  header: {
     alignItems: 'center',
-    padding: theme.spacing.padding,
-    gap: theme.spacing.marginMedium,
+    marginBottom: modernTheme.spacing.marginXLarge,
   },
-  infoCard: {
-    backgroundColor: theme.colors.chartBackground,
-    borderRadius: 8,
-    padding: theme.spacing.paddingMedium,
-    marginBottom: theme.spacing.marginLarge,
-    width: '100%',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+  headerEmoji: {
+    fontSize: 48,
+    marginBottom: modernTheme.spacing.marginMedium,
   },
-  infoTitle: {
-    fontSize: theme.fontSizes.subtitle,
-    color: theme.colors.primaryText,
-    fontWeight: '600',
-    marginBottom: theme.spacing.marginSmall,
+  title: {
+    fontSize: modernTheme.fontSizes.largeTitle,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    textAlign: 'center',
+    marginBottom: modernTheme.spacing.marginSmall,
   },
-  infoText: {
-    fontSize: theme.fontSizes.body,
-    color: theme.colors.secondaryText,
+  subtitle: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  myClassesButton: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.paddingMedium,
+    marginBottom: modernTheme.spacing.marginXLarge,
+    borderLeftWidth: 4,
+    borderLeftColor: modernTheme.colors.turquoise,
+    ...modernTheme.shadows.medium,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonEmoji: {
+    fontSize: 24,
+    marginRight: modernTheme.spacing.marginMedium,
+  },
+  buttonTextContainer: {
+    flex: 1,
+  },
+  buttonTitle: {
+    fontSize: modernTheme.fontSizes.body,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginTiny,
+  },
+  buttonSubtitle: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
+  },
+  buttonArrow: {
+    fontSize: modernTheme.fontSizes.title,
+    color: modernTheme.colors.turquoise,
+    fontWeight: 'bold',
+  },
+  instructionsCard: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.paddingMedium,
+    marginBottom: modernTheme.spacing.marginXLarge,
+    borderLeftWidth: 4,
+    borderLeftColor: modernTheme.colors.coral,
+    ...modernTheme.shadows.small,
+  },
+  instructionsTitle: {
+    fontSize: modernTheme.fontSizes.body,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  stepContainer: {
+    gap: modernTheme.spacing.marginMedium,
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: modernTheme.colors.coral,
+    color: '#FFFFFF',
+    fontSize: modernTheme.fontSizes.caption,
+    fontWeight: 'bold',
+    textAlign: 'center',
     lineHeight: 24,
+    marginRight: modernTheme.spacing.marginMedium,
+  },
+  stepText: {
+    fontSize: modernTheme.fontSizes.label,
+    color: modernTheme.colors.secondaryText,
+    flex: 1,
+  },
+  formContainer: {
+    marginBottom: modernTheme.spacing.marginXLarge,
+  },
+  inputLabel: {
+    fontSize: modernTheme.fontSizes.label,
+    fontWeight: '600',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
   },
   input: {
-    width: '100%',
-    marginBottom: theme.spacing.marginLarge,
-    backgroundColor: theme.colors.chartBackground,
-    color: theme.colors.primaryText,
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.padding,
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.primaryText,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    marginBottom: modernTheme.spacing.marginLarge,
+    textAlign: 'center',
+    fontWeight: '600',
+    letterSpacing: 2,
+    ...modernTheme.shadows.small,
   },
-  button: {
-    backgroundColor: theme.colors.accent,
-    padding: theme.spacing.padding * 0.8,
-    borderRadius: 8,
+  joinButton: {
+    backgroundColor: modernTheme.colors.turquoise,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.paddingMedium,
     alignItems: 'center',
-    width: '100%',
-    marginVertical: theme.spacing.marginSmall,
+    ...modernTheme.shadows.medium,
   },
-  buttonText: {
-    color: theme.colors.chartBackground,
-    fontSize: theme.fontSizes.label,
-    fontWeight: '500',
+  joinButtonText: {
+    color: '#FFFFFF',
+    fontSize: modernTheme.fontSizes.body,
+    fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  footer: {
+    alignItems: 'center',
+    paddingTop: modernTheme.spacing.paddingLarge,
+  },
+  footerText: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });
 

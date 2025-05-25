@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import globalStyles from '../screens/globalStyles';
 import theme from '../screens/theme';
-import config from '../config'; // Ruta corregida
-
+import config from '../config';
 
 const EmotionSelectionScreen = ({ route, navigation }) => {
   const { mood } = route.params;

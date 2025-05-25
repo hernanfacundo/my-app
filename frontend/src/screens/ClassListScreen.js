@@ -15,6 +15,7 @@ const ClassListScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const loadClasses = async () => {
     try {
@@ -46,6 +47,75 @@ const ClassListScreen = ({ navigation }) => {
     }
   };
 
+  const viewClassAnalysis = async (classId) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `${config.API_BASE_URL}/classes/${classId}/analysis`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` }
+        }
+      );
+
+      // Separar alertas por severidad
+      const highAlerts = response.data.alerts.filter(a => a.severity === 'HIGH');
+      const mediumAlerts = response.data.alerts.filter(a => a.severity === 'MEDIUM');
+      const lowAlerts = response.data.alerts.filter(a => a.severity === 'LOW');
+
+      // Primero mostrar alertas si hay alguna de alta severidad
+      if (highAlerts.length > 0) {
+        Alert.alert(
+          '⚠️ Alertas Importantes',
+          `Se han detectado ${highAlerts.length} situaciones que requieren atención inmediata:\n\n` +
+          highAlerts.map(alert => `• ${alert.description} (${alert.studentId.name})`).join('\n\n'),
+          [
+            {
+              text: 'Ver Análisis Completo',
+              onPress: () => showFullAnalysis(response.data)
+            },
+            { text: 'Cerrar', style: 'cancel' }
+          ]
+        );
+      } else {
+        // Si no hay alertas críticas, mostrar el análisis directamente
+        showFullAnalysis(response.data);
+      }
+    } catch (error) {
+      console.error('Error al obtener análisis:', error);
+      Alert.alert('Error', 'No se pudo obtener el análisis de la clase');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showFullAnalysis = (data) => {
+    const alertSummary = data.alerts.length > 0 
+      ? '\n\nAlertas Activas:\n' + data.alerts
+          .map(a => `• ${a.severity === 'HIGH' ? '🔴' : a.severity === 'MEDIUM' ? '🟡' : '🟢'} ${a.description}`)
+          .join('\n')
+      : '';
+
+    Alert.alert(
+      'Análisis de la Clase',
+      data.insights + alertSummary,
+      [
+        {
+          text: 'Ver Estadísticas',
+          onPress: () => {
+            Alert.alert(
+              'Estadísticas Detalladas',
+              `Tamaño de la clase: ${data.classSize} estudiantes\n\n` +
+              `Estados de ánimo registrados: ${data.moodAnalysis.total}\n` +
+              `Entradas de gratitud: ${data.gratitudeAnalysis.total}\n` +
+              `Estudiantes practicando gratitud: ${data.gratitudeAnalysis.studentsWithGratitude}`
+            );
+          }
+        },
+        { text: 'Cerrar', style: 'cancel' }
+      ]
+    );
+  };
+
   const createClass = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Escribe un nombre de clase');
@@ -56,7 +126,7 @@ const ClassListScreen = ({ navigation }) => {
         `${config.API_BASE_URL}/classes`,
         { 
           name,
-          teacherId: user.id  // Agregamos el ID del profesor
+          teacherId: user.id
         },
         { 
           headers: { 
@@ -103,12 +173,18 @@ const ClassListScreen = ({ navigation }) => {
         data={classes}
         keyExtractor={item => item._id}
         renderItem={({ item }) => (
-          <View style={styles.classCard}>
+          <TouchableOpacity 
+            style={styles.classCard}
+            onPress={() => user?.role === 'teacher' ? viewClassAnalysis(item._id) : null}
+          >
             <Text style={styles.className}>{item.name}</Text>
             {user?.role === 'teacher' && (
-              <Text style={styles.classCode}>Código: {item.code}</Text>
+              <>
+                <Text style={styles.classCode}>Código: {item.code}</Text>
+                <Text style={styles.tapHint}>Toca para ver análisis</Text>
+              </>
             )}
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
           <Text style={styles.emptyText}>
@@ -145,66 +221,58 @@ const ClassListScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: theme.spacing.padding,
-    backgroundColor: theme.colors.primaryBackground,
+    padding: 20,
+    backgroundColor: theme.colors.background,
   },
   title: {
-    fontSize: theme.fontSizes.title,
-    color: theme.colors.primaryText,
-    marginBottom: theme.spacing.marginLarge,
-    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: theme.colors.text,
   },
   classCard: {
-    backgroundColor: theme.colors.chartBackground,
-    padding: theme.spacing.padding,
-    borderRadius: 8,
-    marginBottom: theme.spacing.marginMedium,
+    backgroundColor: theme.colors.card,
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
   },
   className: {
-    fontSize: theme.fontSizes.subtitle,
-    color: theme.colors.primaryText,
+    fontSize: 18,
     fontWeight: '500',
+    color: theme.colors.text,
   },
   classCode: {
-    fontSize: theme.fontSizes.body,
-    color: theme.colors.secondaryText,
-    marginTop: theme.spacing.marginSmall,
+    fontSize: 14,
+    color: theme.colors.secondary,
+    marginTop: 5,
+  },
+  tapHint: {
+    fontSize: 12,
+    color: theme.colors.accent,
+    marginTop: 5,
+    fontStyle: 'italic',
   },
   emptyText: {
-    fontSize: theme.fontSizes.body,
-    color: theme.colors.secondaryText,
     textAlign: 'center',
-    marginTop: theme.spacing.marginLarge,
+    color: theme.colors.secondary,
+    marginTop: 20,
   },
   createSection: {
-    marginTop: theme.spacing.marginLarge,
-    padding: theme.spacing.padding,
-    backgroundColor: theme.colors.chartBackground,
-    borderRadius: 8,
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
   },
   createTitle: {
-    marginBottom: theme.spacing.marginMedium,
+    marginBottom: 10,
   },
   input: {
-    marginBottom: theme.spacing.marginMedium,
-  },
-  button: {
-    backgroundColor: theme.colors.accent,
-    padding: theme.spacing.padding * 0.8,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
-    marginVertical: theme.spacing.marginSmall,
+    marginBottom: 10,
   },
   createButton: {
-    marginTop: theme.spacing.marginSmall,
-    paddingVertical: theme.spacing.padding * 0.8,
-  }
+    marginTop: 10,
+  },
 });
 
 export default ClassListScreen;

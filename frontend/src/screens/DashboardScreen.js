@@ -89,7 +89,7 @@ const DashboardScreen = ({ navigation }) => {
     { label: 'Muy bien',     emoji: '🙂' },
     { label: 'Bien',         emoji: '😐' },
     { label: 'Más o menos',  emoji: '😕' },
-    { label: 'No tan bien',  emoji: '😔' },
+    { label: 'No tan bien',  emoji: '😔' }
   ];
 
   // Header que muestra los botones de Clases

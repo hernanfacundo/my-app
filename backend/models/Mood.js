@@ -10,7 +10,7 @@ const moodSchema = new Schema({
   mood: {
     type: String,
     required: true,
-    enum: ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Enojado', 'Excelente']
+    enum: ['Excelente', 'Muy bien', 'Bien', 'Más o menos', 'No tan bien']
   },
   emotion: {
     type: String,

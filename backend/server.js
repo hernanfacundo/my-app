@@ -15,6 +15,8 @@ const LearningPath = require('./models/LearningPath');
 const GratitudeEntry = require('./models/GratitudeEntry');
 const Class      = require('./models/Class');
 const Membership = require('./models/Membership');
+const AlertAnalysisService = require('./services/alertAnalysis.service');
+const Alert = require('./models/Alert');
 
 
 const app = express();
@@ -128,7 +130,7 @@ app.post('/api/moods', authenticateToken, async (req, res) => {
     });
 
     // Validar que los valores estén en los enums permitidos
-    const validMoods = ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Enojado', 'Excelente'];
+    const validMoods = ['Excelente', 'Muy bien', 'Bien', 'Más o menos', 'No tan bien'];
     const validEmotions = [
       'Feliz', 'Entusiasmado', 'Alegre', 'Contento', 'Satisfecho',
       'Optimista', 'Tranquilo', 'Neutral', 'Relajado', 'Confundido',
@@ -598,6 +600,137 @@ app.get('/api/classes/joined', authenticateToken, async (req, res) => {
   }
 });
 
+// Obtener análisis de una clase específica
+app.get('/api/classes/:classId/analysis', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
+    const classId = req.params.classId;
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+    // 1. Obtener todos los alumnos de la clase
+    const memberships = await Membership.find({ classId })
+      .populate('alumnoId');
+    const studentIds = memberships.map(m => m.alumnoId._id);
+
+    // 2. Obtener datos de los últimos 2 días
+    const moods = await Mood.find({
+      userId: { $in: studentIds },
+      createdAt: { $gte: twoDaysAgo }
+    }).sort({ createdAt: -1 });
+
+    const gratitudes = await GratitudeEntry.find({
+      userId: { $in: studentIds },
+      date: { $gte: twoDaysAgo }
+    }).sort({ date: -1 });
+
+    // 3. Análisis de estados de ánimo
+    const moodAnalysis = {
+      total: moods.length,
+      byMood: {},
+      byEmotion: {},
+      byPlace: {}
+    };
+
+    moods.forEach(mood => {
+      moodAnalysis.byMood[mood.mood] = (moodAnalysis.byMood[mood.mood] || 0) + 1;
+      moodAnalysis.byEmotion[mood.emotion] = (moodAnalysis.byEmotion[mood.emotion] || 0) + 1;
+      moodAnalysis.byPlace[mood.place] = (moodAnalysis.byPlace[mood.place] || 0) + 1;
+    });
+
+    // 4. Análisis de gratitud
+    const gratitudeAnalysis = {
+      total: gratitudes.length,
+      studentsWithGratitude: new Set(gratitudes.map(g => g.userId.toString())).size
+    };
+
+    // 5. Obtener alertas activas
+    const activeAlerts = await Alert.find({
+      classId,
+      status: { $in: ['NEW', 'REVIEWED'] },
+      createdAt: { $gte: twoDaysAgo }
+    }).populate('studentId', 'name');
+
+    // 6. Ejecutar análisis de alertas en background
+    setImmediate(async () => {
+      try {
+        await AlertAnalysisService.analyzeClass(classId);
+      } catch (error) {
+        console.error('Error en análisis asíncrono:', error);
+      }
+    });
+
+    // 7. Generar insights con OpenAI incluyendo alertas
+    const analysisPrompt = `
+Eres un experto en psicología educativa y bienestar estudiantil. Analiza los siguientes datos de una clase en los últimos 2 días:
+
+Estados de ánimo registrados: ${moods.length}
+Distribución de estados: ${JSON.stringify(moodAnalysis.byMood)}
+Emociones predominantes: ${JSON.stringify(moodAnalysis.byEmotion)}
+Lugares frecuentes: ${JSON.stringify(moodAnalysis.byPlace)}
+Entradas de gratitud: ${gratitudeAnalysis.total}
+Estudiantes que practican gratitud: ${gratitudeAnalysis.studentsWithGratitude} de ${studentIds.length}
+Alertas activas: ${activeAlerts.length}
+
+Alertas destacadas:
+${activeAlerts.map(alert => `- ${alert.severity} - ${alert.description} (${alert.studentId.name})`).join('\n')}
+
+Por favor, proporciona:
+1. Un resumen breve del estado emocional general de la clase
+2. Aspectos positivos a destacar
+3. Áreas que requieren atención inmediata
+4. 2-3 recomendaciones específicas para el docente
+5. Sugerencias de actividades para mejorar el bienestar del grupo
+
+Mantén un tono profesional pero empático, y enfócate en acciones prácticas.`;
+
+    let insights = "No hay suficientes datos para generar un análisis detallado.";
+    
+    if (moods.length > 0 || gratitudes.length > 0) {
+      try {
+        const openaiResponse = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'Eres un experto en psicología educativa y bienestar estudiantil.' },
+              { role: 'user', content: analysisPrompt }
+            ],
+            max_tokens: 500,
+            temperature: 0.7
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        insights = openaiResponse.data.choices[0].message.content.trim();
+      } catch (error) {
+        console.error('Error al generar insights:', error);
+      }
+    }
+
+    res.json({
+      classSize: studentIds.length,
+      moodAnalysis,
+      gratitudeAnalysis,
+      alerts: activeAlerts,
+      insights
+    });
+
+  } catch (error) {
+    console.error('Error al analizar la clase:', error);
+    res.status(500).json({ 
+      message: 'Error al analizar la clase', 
+      error: error.message 
+    });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));

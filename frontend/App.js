@@ -6,16 +6,22 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 // Contexto de autenticación
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
+// Tutorial Wrapper
+import TutorialWrapper from './src/components/TutorialWrapper';
+
 // Pantallas públicas
 import SignInScreen    from './src/screens/SignInScreen';
 import SignUpScreen    from './src/screens/SignUpScreen';
 
 // Pantalla principal
 import DashboardScreen from './src/screens/DashboardScreen';
+import DirectivoDashboard from './src/screens/DirectivoDashboard';
+import AnalisisDetallado from './src/screens/AnalisisDetallado';
 
 // Funcionalidades de clases
 import ClassListScreen from './src/screens/ClassListScreen';
 import JoinClassScreen from './src/screens/JoinClassScreen';
+import ClassSummaryScreen from './src/screens/ClassSummaryScreen';
 
 // Mood & Gratitud
 import EmotionSelection from './src/screens/EmotionSelectionScreen';
@@ -32,6 +38,9 @@ import LearningPathDetail from './src/screens/LearningPathDetailScreen';
 // Chatbot
 import ChatbotScreen from './src/screens/ChatbotScreen';
 import CreateClassScreen from './src/screens/CreateClassScreen';
+
+// Insignias
+import BadgesScreen from './src/screens/BadgesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -62,37 +71,55 @@ function AppNavigator() {
             />
           </>
         ) : (
-          // Stack principal
-          <>
-            <Stack.Screen 
-              name="Dashboard" 
-              component={DashboardScreen} 
-              options={{ headerShown: false }}
-            />
+          // Stack principal envuelto en TutorialWrapper
+          <Stack.Screen 
+            name="AuthenticatedApp" 
+            options={{ headerShown: false }}
+          >
+            {() => (
+              <TutorialWrapper>
+                <Stack.Navigator
+                  screenOptions={{ headerShown: false }}
+                  initialRouteName="Dashboard"
+                >
+                  <Stack.Screen 
+                    name="Dashboard" 
+                    component={user?.role === 'directivo' ? DirectivoDashboard : DashboardScreen} 
+                    options={{ headerShown: false }}
+                  />
 
-            {/* Clases */}
-            <Stack.Screen name="ClassList" component={ClassListScreen} />
-            <Stack.Screen name="JoinClass" component={JoinClassScreen} />
-            <Stack.Screen name="CreateClass" component={CreateClassScreen} />
+                  {/* Análisis detallado para directivos */}
+                  <Stack.Screen name="AnalisisDetallado" component={AnalisisDetallado} />
 
-            {/* Estados de ánimo */}
-            <Stack.Screen name="EmotionSelection" component={EmotionSelection} />
-            <Stack.Screen name="PlaceSelection" component={PlaceSelection} />
-            <Stack.Screen name="Comment" component={CommentScreen} />
-            <Stack.Screen name="MoodHistory" component={MoodHistory} />
+                  {/* Clases */}
+                  <Stack.Screen name="ClassList" component={ClassListScreen} />
+                  <Stack.Screen name="JoinClass" component={JoinClassScreen} />
+                  <Stack.Screen name="CreateClass" component={CreateClassScreen} />
+                  <Stack.Screen name="ClassSummary" component={ClassSummaryScreen} />
 
-            {/* Gratitud */}
-            <Stack.Screen name="GratitudeEntry" component={GratitudeEntry} />
-            <Stack.Screen name="GratitudeHistory" component={GratitudeHistory} />
+                  {/* Estados de ánimo */}
+                  <Stack.Screen name="EmotionSelection" component={EmotionSelection} />
+                  <Stack.Screen name="PlaceSelection" component={PlaceSelection} />
+                  <Stack.Screen name="Comment" component={CommentScreen} />
+                  <Stack.Screen name="MoodHistory" component={MoodHistory} />
 
-            {/* Rutas de aprendizaje */}
-            <Stack.Screen name="LearningPaths" component={LearningPaths} />
-            <Stack.Screen name="LearningPathDetail" component={LearningPathDetail} />
+                  {/* Gratitud */}
+                  <Stack.Screen name="GratitudeEntry" component={GratitudeEntry} />
+                  <Stack.Screen name="GratitudeHistory" component={GratitudeHistory} />
 
-            {/* Chatbot */}
-            <Stack.Screen name="Chatbot" component={ChatbotScreen} />
-            
-          </>
+                  {/* Rutas de aprendizaje */}
+                  <Stack.Screen name="LearningPaths" component={LearningPaths} />
+                  <Stack.Screen name="LearningPathDetail" component={LearningPathDetail} />
+
+                  {/* Chatbot */}
+                  <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+                  
+                  {/* Insignias */}
+                  <Stack.Screen name="Badges" component={BadgesScreen} />
+                </Stack.Navigator>
+              </TutorialWrapper>
+            )}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>

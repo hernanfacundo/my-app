@@ -5,27 +5,41 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import modernTheme from './modernTheme';
 import config from '../config';
+import { useAuth } from '../context/AuthContext';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 const SignUpScreen = ({ navigation }) => {
+  const { login } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [role, setRole] = useState('student');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useContext(AuthContext);
+  const [loading, setLoading] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const handleSignUp = async () => {
-    if (!email || !password || !name) {
-      Alert.alert('¡Faltan datos! 📝', 'Por favor completa todos los campos para crear tu cuenta');
+    if (!name || !email || !password) {
+      showModal({
+        title: '¡Faltan datos! 📝',
+        message: 'Por favor completa todos los campos para crear tu cuenta',
+        emoji: '📝',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Contraseña muy corta 🔒', 'Tu contraseña debe tener al menos 6 caracteres para mayor seguridad');
+      showModal({
+        title: 'Contraseña muy corta 🔒',
+        message: 'Tu contraseña debe tener al menos 6 caracteres para mayor seguridad',
+        emoji: '🔒',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     console.log('Datos enviados al registro:', { email, password, name, role });
     
     try {
@@ -34,158 +48,205 @@ const SignUpScreen = ({ navigation }) => {
       await login(token);
       navigation.navigate('Dashboard');
     } catch (error) {
-      Alert.alert('Error al registrarse 😕', 'No pudimos crear tu cuenta. ¿Ya existe una cuenta con este email?');
       console.error('Error al registrar usuario:', error);
+      showModal({
+        title: 'Error al registrarse 😕',
+        message: 'No pudimos crear tu cuenta. ¿Ya existe una cuenta con este email?',
+        emoji: '😕',
+        buttonText: 'Intentar de nuevo'
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const getRoleEmoji = (selectedRole) => {
-    return selectedRole === 'student' ? '🎓' : '👩‍🏫';
+    switch (selectedRole) {
+      case 'student': return '🎓';
+      case 'teacher': return '👩‍🏫';
+      case 'directivo': return '🏫';
+      default: return '🎓';
+    }
   };
 
   const getRoleDescription = (selectedRole) => {
-    return selectedRole === 'student' 
-      ? 'Explora, aprende y registra tus emociones' 
-      : 'Guía y acompaña a tus estudiantes';
+    switch (selectedRole) {
+      case 'student': return 'Explora, aprende y registra tus emociones';
+      case 'teacher': return 'Guía y acompaña a tus estudiantes';
+      case 'directivo': return 'Supervisa el bienestar de tu escuela';
+      default: return 'Explora, aprende y registra tus emociones';
+    }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header juvenil */}
-      <View style={styles.header}>
-        <Text style={styles.welcomeEmoji}>✨</Text>
-        <Text style={styles.title}>¡Únete a nosotros!</Text>
-        <Text style={styles.subtitle}>Crea tu cuenta y comienza tu viaje emocional</Text>
-      </View>
-
-      {/* Formulario moderno */}
-      <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>👤 ¿Cómo te llamas?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Tu nombre completo"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
+    <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Header juvenil */}
+        <View style={styles.header}>
+          <Text style={styles.welcomeEmoji}>✨</Text>
+          <Text style={styles.title}>¡Únete a nosotros!</Text>
+          <Text style={styles.subtitle}>Crea tu cuenta y comienza tu viaje emocional</Text>
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>📧 Tu email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ejemplo@correo.com"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>🔒 Crea una contraseña</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Mínimo 6 caracteres"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        {/* Selector de rol moderno */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>🎯 ¿Cuál es tu rol?</Text>
-          <View style={styles.roleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                role === 'student' && styles.roleOptionSelected,
-                { backgroundColor: role === 'student' ? modernTheme.colors.turquoise : modernTheme.colors.chartBackground }
-              ]}
-              onPress={() => setRole('student')}
-            >
-              <Text style={[
-                styles.roleEmoji,
-                { opacity: role === 'student' ? 1 : 0.6 }
-              ]}>🎓</Text>
-              <Text style={[
-                styles.roleTitle,
-                { color: role === 'student' ? '#FFFFFF' : modernTheme.colors.primaryText }
-              ]}>Estudiante</Text>
-              <Text style={[
-                styles.roleDescription,
-                { color: role === 'student' ? '#FFFFFF' : modernTheme.colors.secondaryText }
-              ]}>Explora y aprende</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                role === 'teacher' && styles.roleOptionSelected,
-                { backgroundColor: role === 'teacher' ? modernTheme.colors.coral : modernTheme.colors.chartBackground }
-              ]}
-              onPress={() => setRole('teacher')}
-            >
-              <Text style={[
-                styles.roleEmoji,
-                { opacity: role === 'teacher' ? 1 : 0.6 }
-              ]}>👩‍🏫</Text>
-              <Text style={[
-                styles.roleTitle,
-                { color: role === 'teacher' ? '#FFFFFF' : modernTheme.colors.primaryText }
-              ]}>Docente</Text>
-              <Text style={[
-                styles.roleDescription,
-                { color: role === 'teacher' ? '#FFFFFF' : modernTheme.colors.secondaryText }
-              ]}>Guía y acompaña</Text>
-            </TouchableOpacity>
+        {/* Formulario moderno */}
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>�� ¿Cómo te llamas?</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Tu nombre completo"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
           </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>📧 Tu email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="ejemplo@correo.com"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>🔒 Crea una contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Mínimo 6 caracteres"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          {/* Selector de rol moderno */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>�� ¿Cuál es tu rol?</Text>
+            <View style={styles.roleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  role === 'student' && styles.roleOptionSelected,
+                  { backgroundColor: role === 'student' ? modernTheme.colors.turquoise : modernTheme.colors.chartBackground }
+                ]}
+                onPress={() => setRole('student')}
+              >
+                <Text style={[
+                  styles.roleEmoji,
+                  { opacity: role === 'student' ? 1 : 0.6 }
+                ]}>🎓</Text>
+                <Text style={[
+                  styles.roleTitle,
+                  { color: role === 'student' ? '#FFFFFF' : modernTheme.colors.primaryText }
+                ]}>Estudiante</Text>
+                <Text style={[
+                  styles.roleDescription,
+                  { color: role === 'student' ? '#FFFFFF' : modernTheme.colors.secondaryText }
+                ]}>Explora y aprende</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  role === 'teacher' && styles.roleOptionSelected,
+                  { backgroundColor: role === 'teacher' ? modernTheme.colors.coral : modernTheme.colors.chartBackground }
+                ]}
+                onPress={() => setRole('teacher')}
+              >
+                <Text style={[
+                  styles.roleEmoji,
+                  { opacity: role === 'teacher' ? 1 : 0.6 }
+                ]}>👩‍🏫</Text>
+                <Text style={[
+                  styles.roleTitle,
+                  { color: role === 'teacher' ? '#FFFFFF' : modernTheme.colors.primaryText }
+                ]}>Docente</Text>
+                <Text style={[
+                  styles.roleDescription,
+                  { color: role === 'teacher' ? '#FFFFFF' : modernTheme.colors.secondaryText }
+                ]}>Guía y acompaña</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  role === 'directivo' && styles.roleOptionSelected,
+                  { backgroundColor: role === 'directivo' ? modernTheme.colors.lavender : modernTheme.colors.chartBackground }
+                ]}
+                onPress={() => setRole('directivo')}
+              >
+                <Text style={[
+                  styles.roleEmoji,
+                  { opacity: role === 'directivo' ? 1 : 0.6 }
+                ]}>🏫</Text>
+                <Text style={[
+                  styles.roleTitle,
+                  { color: role === 'directivo' ? '#FFFFFF' : modernTheme.colors.primaryText }
+                ]}>Directivo</Text>
+                <Text style={[
+                  styles.roleDescription,
+                  { color: role === 'directivo' ? '#FFFFFF' : modernTheme.colors.secondaryText }
+                ]}>Supervisa y analiza</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Botón principal */}
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && styles.buttonDisabled]}
+            onPress={handleSignUp}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? '⏳ Creando cuenta...' : `${getRoleEmoji(role)} ¡Crear mi cuenta!`}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Separador */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Link a login */}
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => navigation.navigate('SignIn')}
+          >
+            <Text style={styles.linkText}>
+              🔑 ¿Ya tienes cuenta? Inicia sesión
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Botón principal */}
-        <TouchableOpacity
-          style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-          onPress={handleSignUp}
-          disabled={isLoading}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isLoading ? '⏳ Creando cuenta...' : `${getRoleEmoji(role)} ¡Crear mi cuenta!`}
+        {/* Footer motivacional */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            🌟 Al registrarte, comenzarás un viaje increíble de autoconocimiento
           </Text>
-        </TouchableOpacity>
-
-        {/* Separador */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>o</Text>
-          <View style={styles.dividerLine} />
         </View>
-
-        {/* Link a login */}
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => navigation.navigate('SignIn')}
-        >
-          <Text style={styles.linkText}>
-            🔑 ¿Ya tienes cuenta? Inicia sesión
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Footer motivacional */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          🌟 Al registrarte, comenzarás un viaje increíble de autoconocimiento
-        </Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
+    </View>
   );
 };
 
@@ -246,33 +307,37 @@ const styles = StyleSheet.create({
   },
   roleContainer: {
     flexDirection: 'row',
-    gap: modernTheme.spacing.marginMedium,
+    gap: modernTheme.spacing.marginSmall,
   },
   roleOption: {
     flex: 1,
-    padding: modernTheme.spacing.paddingMedium,
+    padding: modernTheme.spacing.paddingSmall,
     borderRadius: modernTheme.borderRadius.medium,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
     ...modernTheme.shadows.small,
+    minHeight: 100,
+    justifyContent: 'center',
   },
   roleOptionSelected: {
     borderColor: modernTheme.colors.primaryText,
     ...modernTheme.shadows.medium,
   },
   roleEmoji: {
-    fontSize: 32,
-    marginBottom: modernTheme.spacing.marginSmall,
+    fontSize: 28,
+    marginBottom: modernTheme.spacing.marginTiny,
   },
   roleTitle: {
-    fontSize: modernTheme.fontSizes.body,
+    fontSize: modernTheme.fontSizes.label,
     fontWeight: 'bold',
     marginBottom: modernTheme.spacing.marginTiny,
+    textAlign: 'center',
   },
   roleDescription: {
     fontSize: modernTheme.fontSizes.caption,
     textAlign: 'center',
+    lineHeight: 14,
   },
   primaryButton: {
     backgroundColor: modernTheme.colors.turquoise,

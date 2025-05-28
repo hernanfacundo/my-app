@@ -12,20 +12,28 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import config from '../config';
 import modernTheme from './modernTheme';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 const CreateClassScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [className, setClassName] = useState('');
   const [description, setDescription] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const handleCreateClass = async () => {
     if (!className.trim()) {
-      Alert.alert('¡Oops! 📝', 'Por favor ingresa un nombre para tu clase');
+      showModal({
+        title: '¡Oops! 📝',
+        message: 'Por favor ingresa un nombre para tu clase',
+        emoji: '📝',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     try {
       const response = await axios.post(
         `${config.API_BASE_URL}/classes`,
@@ -40,21 +48,24 @@ const CreateClassScreen = ({ navigation }) => {
 
       const classCode = response.data.code || 'ABC123'; // Fallback si no viene el código
 
-      Alert.alert(
-        '¡Clase creada! 🎉',
-        `Tu clase "${className}" está lista.\n\nCódigo: ${classCode}\n\nComparte este código con tus estudiantes para que se unan.`,
-        [
-          {
-            text: 'Ver mis clases',
-            onPress: () => navigation.navigate('ClassList')
-          }
-        ]
-      );
+      showModal({
+        title: '¡Clase creada! 🎉',
+        message: `Tu clase "${className}" está lista.\n\nCódigo: ${classCode}\n\nComparte este código con tus estudiantes para que se unan.`,
+        emoji: '🎉',
+        buttonText: 'Ver mis clases'
+      });
+      
+      navigation.navigate('ClassList');
     } catch (error) {
       console.error('Error creando clase:', error);
-      Alert.alert('Error al crear clase 😕', 'No pudimos crear tu clase. ¿Intentas de nuevo?');
+      showModal({
+        title: 'Error al crear clase 😕',
+        message: 'No pudimos crear tu clase. ¿Intentas de nuevo?',
+        emoji: '😕',
+        buttonText: 'Intentar de nuevo'
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -67,102 +78,114 @@ const CreateClassScreen = ({ navigation }) => {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header juvenil */}
-      <View style={styles.header}>
-        <Text style={styles.headerEmoji}>👩‍🏫</Text>
-        <Text style={styles.title}>¡Crea tu clase!</Text>
-        <Text style={styles.subtitle}>Conecta con tus estudiantes de manera moderna</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Header juvenil */}
+        <View style={styles.header}>
+          <Text style={styles.headerEmoji}>👩‍🏫</Text>
+          <Text style={styles.title}>¡Crea tu clase!</Text>
+          <Text style={styles.subtitle}>Conecta con tus estudiantes de manera moderna</Text>
+        </View>
 
-      {/* Tarjeta de beneficios */}
-      <View style={styles.benefitsCard}>
-        <Text style={styles.benefitsTitle}>✨ ¿Qué puedes hacer?</Text>
-        <View style={styles.benefitsList}>
-          <View style={styles.benefit}>
-            <Text style={styles.benefitIcon}>📊</Text>
-            <Text style={styles.benefitText}>Monitorear el estado emocional</Text>
-          </View>
-          <View style={styles.benefit}>
-            <Text style={styles.benefitIcon}>🎯</Text>
-            <Text style={styles.benefitText}>Asignar rutas de aprendizaje</Text>
-          </View>
-          <View style={styles.benefit}>
-            <Text style={styles.benefitIcon}>💬</Text>
-            <Text style={styles.benefitText}>Comunicarte directamente</Text>
+        {/* Tarjeta de beneficios */}
+        <View style={styles.benefitsCard}>
+          <Text style={styles.benefitsTitle}>✨ ¿Qué puedes hacer?</Text>
+          <View style={styles.benefitsList}>
+            <View style={styles.benefit}>
+              <Text style={styles.benefitIcon}>📊</Text>
+              <Text style={styles.benefitText}>Monitorear el estado emocional</Text>
+            </View>
+            <View style={styles.benefit}>
+              <Text style={styles.benefitIcon}>🎯</Text>
+              <Text style={styles.benefitText}>Asignar rutas de aprendizaje</Text>
+            </View>
+            <View style={styles.benefit}>
+              <Text style={styles.benefitIcon}>💬</Text>
+              <Text style={styles.benefitText}>Comunicarte directamente</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Formulario moderno */}
-      <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>📚 Nombre de tu clase</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: Matemáticas 3° A"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={className}
-            onChangeText={setClassName}
-            maxLength={50}
-          />
-          <Text style={styles.inputHint}>
-            💡 Usa un nombre claro que tus estudiantes reconozcan fácilmente
+        {/* Formulario moderno */}
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>📚 Nombre de tu clase</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: Matemáticas 3° A"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={className}
+              onChangeText={setClassName}
+              maxLength={50}
+            />
+            <Text style={styles.inputHint}>
+              💡 Usa un nombre claro que tus estudiantes reconozcan fácilmente
+            </Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>📝 Descripción (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Describe de qué trata tu clase, objetivos, horarios, etc."
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              maxLength={200}
+              textAlignVertical="top"
+            />
+            <Text style={styles.inputHint}>
+              ✍️ Ayuda a tus estudiantes a entender mejor tu clase
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.createButton, loading && styles.buttonDisabled]}
+            onPress={handleCreateClass}
+            disabled={loading}
+          >
+            <Text style={styles.createButtonText}>
+              {loading ? '⏳ Creando clase...' : '🚀 ¡Crear mi clase!'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sugerencias */}
+        <View style={styles.suggestionsCard}>
+          <Text style={styles.suggestionsTitle}>💭 Ideas para nombres:</Text>
+          <View style={styles.suggestionsList}>
+            {getClassNameSuggestions().map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.suggestionChip}
+                onPress={() => setClassName(suggestion)}
+              >
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Footer motivacional */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            🌟 Una vez creada, recibirás un código único para compartir con tus estudiantes
           </Text>
         </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>📝 Descripción (opcional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Describe de qué trata tu clase, objetivos, horarios, etc."
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            maxLength={200}
-            textAlignVertical="top"
-          />
-          <Text style={styles.inputHint}>
-            ✍️ Ayuda a tus estudiantes a entender mejor tu clase
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.createButton, isLoading && styles.buttonDisabled]}
-          onPress={handleCreateClass}
-          disabled={isLoading}
-        >
-          <Text style={styles.createButtonText}>
-            {isLoading ? '⏳ Creando clase...' : '🚀 ¡Crear mi clase!'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Sugerencias */}
-      <View style={styles.suggestionsCard}>
-        <Text style={styles.suggestionsTitle}>💭 Ideas para nombres:</Text>
-        <View style={styles.suggestionsList}>
-          {getClassNameSuggestions().map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.suggestionChip}
-              onPress={() => setClassName(suggestion)}
-            >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Footer motivacional */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          🌟 Una vez creada, recibirás un código único para compartir con tus estudiantes
-        </Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
+    </View>
   );
 };
 

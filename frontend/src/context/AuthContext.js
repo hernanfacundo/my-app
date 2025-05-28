@@ -20,11 +20,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Verificar token al inicio
+  // NO verificar token al inicio - siempre empezar con login
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Limpiar el token al iniciar la app (temporal)
+        // Limpiar cualquier token guardado al iniciar la app
         await AsyncStorage.removeItem('userToken');
         setUser(null);
       } catch (error) {
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Token expirado');
       }
 
-      // Guardar el token
+      // Guardar el token temporalmente para las peticiones de la sesión actual
       await AsyncStorage.setItem('userToken', token);
       
       // Guardar la información del usuario

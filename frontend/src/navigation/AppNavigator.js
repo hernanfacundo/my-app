@@ -16,7 +16,7 @@ import ChatbotScreen from '../screens/ChatbotScreen';
 import ClassListScreen from '../screens/ClassListScreen';
 import JoinClassScreen from '../screens/JoinClassScreen';
 import CreateClassScreen from '../screens/CreateClassScreen';
-
+import BadgesScreen from '../screens/BadgesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +37,7 @@ const screens = [
   { name: 'ClassList', component: ClassListScreen },
   { name: 'JoinClass', component: JoinClassScreen },
   { name: 'CreateClass', component: CreateClassScreen },
+  { name: 'Badges', component: BadgesScreen },
 ];
 
 const validScreens = screens.filter(({ component, name }) => {

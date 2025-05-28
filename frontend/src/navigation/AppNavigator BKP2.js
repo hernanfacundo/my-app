@@ -9,6 +9,7 @@ import MoodHistoryScreen from '../screens/MoodHistoryScreen';
 import EmotionSelectionScreen from '../screens/EmotionSelectionScreen';
 import GratitudeEntryScreen from '../screens/GratitudeEntryScreen';
 import GratitudeHistoryScreen from '../screens/GratitudeHistoryScreen';
+import BadgesScreen from '../screens/BadgesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,7 @@ const screens = [
   { name: 'EmotionSelection', component: EmotionSelectionScreen },
   { name: 'GratitudeEntry', component: GratitudeEntryScreen },
   { name: 'GratitudeHistory', component: GratitudeHistoryScreen },
+  { name: 'Badges', component: BadgesScreen },
 ];
 
 const validScreens = screens.filter(({ component, name }) => {

@@ -8,23 +8,36 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import modernTheme from './modernTheme';
 import config from '../config';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 export default function GratitudeEntryScreen({ navigation }) {
-  const [gratitudeText, setGratitudeText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [gratitude, setGratitude] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const saveGratitude = async () => {
-    const trimmed = (gratitudeText || '').trim();
+    const trimmed = (gratitude || '').trim();
     if (!trimmed) {
-      Alert.alert('¡Oops! 💭', 'Por favor, escribe algo hermoso antes de guardar. Tu gratitud es importante para nosotros 🌟');
+      showModal({
+        title: '¡Oops! 💭',
+        message: 'Por favor, escribe algo hermoso antes de guardar. Tu gratitud es importante para nosotros 🌟',
+        emoji: '💭',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
     try {
-      setIsLoading(true);
+      setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        Alert.alert('Sesión expirada 🔐', 'Por favor, inicia sesión nuevamente para continuar');
+        showModal({
+          title: 'Sesión expirada 🔐',
+          message: 'Por favor, inicia sesión nuevamente para continuar',
+          emoji: '🔐',
+          buttonText: 'Ir a inicio'
+        });
         navigation.navigate('SignIn');
         return;
       }
@@ -39,7 +52,7 @@ export default function GratitudeEntryScreen({ navigation }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log('Respuesta del backend:', response.data);
+      console.log('Respuesta del servidor:', response.data);
 
       // Extraemos la reflexión generada por OpenAI
       const { reflect } = response.data;
@@ -62,16 +75,35 @@ export default function GratitudeEntryScreen({ navigation }) {
         { cancelable: false }
       );
 
-      setGratitudeText('');
+      showModal({
+        title: '¡Gratitud guardada! ✨',
+        message: 'Tu momento de gratitud se guardó con amor. ¡Sigue cultivando la positividad! 🌱💚',
+        emoji: '✨',
+        buttonText: '¡Genial!'
+      });
+
+      setGratitude('');
     } catch (error) {
       console.error('Error al enviar la solicitud al backend:', error.message);
-      console.error('Detalles del error:', error.response?.data || error);
-      Alert.alert(
-        'Error al guardar 😕',
-        error.response?.data?.message || 'No pudimos guardar tu gratitud. ¿Intentas de nuevo?'
-      );
+      
+      if (error.response?.status === 401) {
+        showModal({
+          title: 'Sesión expirada 🔐',
+          message: 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente',
+          emoji: '🔐',
+          buttonText: 'Ir a inicio'
+        });
+        navigation.navigate('SignIn');
+      } else {
+        showModal({
+          title: 'Error al guardar 😕',
+          message: 'No pudimos guardar tu gratitud en este momento. ¿Intentas de nuevo?',
+          emoji: '😕',
+          buttonText: 'Intentar de nuevo'
+        });
+      }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -88,7 +120,7 @@ export default function GratitudeEntryScreen({ navigation }) {
   };
 
   const getCharacterCount = () => {
-    return gratitudeText.length;
+    return gratitude.length;
   };
 
   const getCharacterColor = () => {
@@ -100,91 +132,103 @@ export default function GratitudeEntryScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header inspiracional */}
-      <View style={styles.header}>
-        <Text style={styles.headerEmoji}>🙏</Text>
-        <Text style={styles.title}>Momento de Gratitud</Text>
-        <Text style={styles.subtitle}>Tómate un momento para reflexionar sobre lo bueno de tu día</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Header inspiracional */}
+        <View style={styles.header}>
+          <Text style={styles.headerEmoji}>🙏</Text>
+          <Text style={styles.title}>Momento de Gratitud</Text>
+          <Text style={styles.subtitle}>Tómate un momento para reflexionar sobre lo bueno de tu día</Text>
+        </View>
 
-      {/* Tarjeta motivacional */}
-      <View style={styles.motivationCard}>
-        <Text style={styles.motivationTitle}>💡 ¿Sabías que?</Text>
-        <Text style={styles.motivationText}>
-          Practicar gratitud por solo 5 minutos al día puede mejorar tu bienestar emocional y reducir el estrés. ¡Cada pequeño momento cuenta!
-        </Text>
-      </View>
+        {/* Tarjeta motivacional */}
+        <View style={styles.motivationCard}>
+          <Text style={styles.motivationTitle}>💡 ¿Sabías que?</Text>
+          <Text style={styles.motivationText}>
+            Practicar gratitud por solo 5 minutos al día puede mejorar tu bienestar emocional y reducir el estrés. ¡Cada pequeño momento cuenta!
+          </Text>
+        </View>
 
-      {/* Formulario principal */}
-      <View style={styles.formContainer}>
-        <Text style={styles.inputLabel}>✨ Hoy me siento agradecido/a por...</Text>
-        
-        <View style={styles.textInputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder={getPlaceholderSuggestion()}
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={gratitudeText}
-            onChangeText={setGratitudeText}
-            multiline
-            numberOfLines={6}
-            maxLength={200}
-            editable={!isLoading}
-            textAlignVertical="top"
-          />
-          <View style={styles.characterCounter}>
-            <Text style={[styles.characterText, { color: getCharacterColor() }]}>
-              {getCharacterCount()}/200
+        {/* Formulario principal */}
+        <View style={styles.formContainer}>
+          <Text style={styles.inputLabel}>✨ Hoy me siento agradecido/a por...</Text>
+          
+          <View style={styles.textInputContainer}>
+            <TextInput
+              style={styles.textInput}
+              placeholder={getPlaceholderSuggestion()}
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={gratitude}
+              onChangeText={setGratitude}
+              multiline
+              numberOfLines={6}
+              maxLength={200}
+              editable={!loading}
+              textAlignVertical="top"
+            />
+            <View style={styles.characterCounter}>
+              <Text style={[styles.characterText, { color: getCharacterColor() }]}>
+                {getCharacterCount()}/200
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.saveButton, loading && styles.buttonDisabled]}
+            onPress={saveGratitude}
+            disabled={loading || !gratitude.trim()}
+          >
+            <Text style={styles.saveButtonText}>
+              {loading ? '⏳ Guardando tu gratitud...' : '🌟 Guardar mi gratitud'}
             </Text>
+          </TouchableOpacity>
+
+          {/* Botón para ver historial */}
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => navigation.navigate('GratitudeHistory')}
+          >
+            <Text style={styles.historyButtonText}>📖 Ver mi historial de gratitud</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sugerencias de gratitud */}
+        <View style={styles.suggestionsCard}>
+          <Text style={styles.suggestionsTitle}>💭 Ideas para inspirarte:</Text>
+          <View style={styles.suggestionsList}>
+            {[
+              '👨‍👩‍👧‍👦 Familia y amigos',
+              '🌅 Momentos del día',
+              '🎯 Logros personales',
+              '🌱 Oportunidades',
+              '💪 Tu fortaleza',
+              '🌈 Pequeños detalles'
+            ].map((suggestion, index) => (
+              <View key={index} style={styles.suggestionChip}>
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveButton, isLoading && styles.buttonDisabled]}
-          onPress={saveGratitude}
-          disabled={isLoading || !gratitudeText.trim()}
-        >
-          <Text style={styles.saveButtonText}>
-            {isLoading ? '⏳ Guardando tu gratitud...' : '🌟 Guardar mi gratitud'}
+        {/* Footer motivacional */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            🌟 Cada momento de gratitud es una semilla de felicidad que plantas en tu corazón
           </Text>
-        </TouchableOpacity>
-
-        {/* Botón para ver historial */}
-        <TouchableOpacity
-          style={styles.historyButton}
-          onPress={() => navigation.navigate('GratitudeHistory')}
-        >
-          <Text style={styles.historyButtonText}>📖 Ver mi historial de gratitud</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Sugerencias de gratitud */}
-      <View style={styles.suggestionsCard}>
-        <Text style={styles.suggestionsTitle}>💭 Ideas para inspirarte:</Text>
-        <View style={styles.suggestionsList}>
-          {[
-            '👨‍👩‍👧‍👦 Familia y amigos',
-            '🌅 Momentos del día',
-            '🎯 Logros personales',
-            '🌱 Oportunidades',
-            '💪 Tu fortaleza',
-            '🌈 Pequeños detalles'
-          ].map((suggestion, index) => (
-            <View key={index} style={styles.suggestionChip}>
-              <Text style={styles.suggestionText}>{suggestion}</Text>
-            </View>
-          ))}
         </View>
-      </View>
-
-      {/* Footer motivacional */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          🌟 Cada momento de gratitud es una semilla de felicidad que plantas en tu corazón
-        </Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
+    </View>
   );
 }
 

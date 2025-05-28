@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Alert,
-  StyleSheet, FlatList
+  StyleSheet, FlatList, ScrollView, Dimensions, RefreshControl
 } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,6 +10,11 @@ import globalStyles from '../screens/globalStyles';
 import modernTheme from '../screens/modernTheme';
 import config from '../config';
 import { useAuth } from '../context/AuthContext';   // <-- nuevo import
+import BadgeCard from '../components/BadgeCard';
+import BadgeService from '../services/badgeService';
+import BadgeNotificationModal from '../components/BadgeNotificationModal';
+import CustomModal from '../components/CustomModal';
+import TutorialDebug from '../components/TutorialDebug';
 
 // Componente CustomButton con nuevo diseño
 const CustomButton = ({ title, onPress, variant = 'primary' }) => {
@@ -39,8 +44,8 @@ const CustomButton = ({ title, onPress, variant = 'primary' }) => {
       onPress={onPress}
     >
       <Text style={getTextStyle()}>{title}</Text>
-    </TouchableOpacity>
-  );
+  </TouchableOpacity>
+);
 };
 
 const DashboardScreen = ({ navigation }) => {
@@ -48,6 +53,18 @@ const DashboardScreen = ({ navigation }) => {
   const [learningPaths, setLearningPaths] = useState([]);
   const [hasGratitudeToday, setHasGratitudeToday] = useState(true);
   const [isLoadingGratitude, setIsLoadingGratitude] = useState(true);
+  
+  // Estados para insignias
+  const [recentBadges, setRecentBadges] = useState([]);
+  const [badgeStats, setBadgeStats] = useState({});
+  const [newBadgeModal, setNewBadgeModal] = useState({ visible: false, badge: null });
+  const [customModal, setCustomModal] = useState({ 
+    visible: false, 
+    title: '', 
+    message: '', 
+    emoji: '', 
+    buttonText: 'Entendido' 
+  });
 
   // Función para obtener colores únicos para cada mood
   const getMoodColor = (index) => {
@@ -87,6 +104,50 @@ const DashboardScreen = ({ navigation }) => {
     return pathIcons[index % pathIcons.length] || '🎯';
   };
 
+  // Función para cargar insignias recientes
+  const loadRecentBadges = useCallback(async () => {
+    try {
+      const [badges, stats] = await Promise.all([
+        BadgeService.getUserBadges(),
+        BadgeService.getUserStats()
+      ]);
+      
+      // Obtener las 3 insignias más recientes desbloqueadas
+      const unlockedBadges = badges
+        .filter(badge => badge.isUnlocked)
+        .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
+        .slice(0, 3);
+      
+      setRecentBadges(unlockedBadges);
+      setBadgeStats(stats);
+    } catch (error) {
+      console.error('Error loading badges:', error);
+      // No mostrar error al usuario, las insignias son opcionales
+    }
+  }, []);
+
+  // Función para mostrar modal personalizado
+  const showCustomModal = ({ title, message, emoji, buttonText = 'Entendido' }) => {
+    setCustomModal({
+      visible: true,
+      title,
+      message,
+      emoji,
+      buttonText
+    });
+  };
+
+  // Función para cerrar modal personalizado
+  const hideCustomModal = () => {
+    setCustomModal({
+      visible: false,
+      title: '',
+      message: '',
+      emoji: '',
+      buttonText: 'Entendido'
+    });
+  };
+
   // Carga rutas de aprendizaje
   useEffect(() => {
     const fetchLearningPaths = async () => {
@@ -112,7 +173,12 @@ const DashboardScreen = ({ navigation }) => {
       setIsLoadingGratitude(true);
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        Alert.alert('Error', 'Por favor, inicia sesión nuevamente');
+        showCustomModal({
+          title: 'Error',
+          message: 'Por favor, inicia sesión nuevamente',
+          emoji: '🔐',
+          buttonText: 'Ir a inicio'
+        });
         navigation.navigate('SignIn');
         return;
       }
@@ -143,6 +209,13 @@ const DashboardScreen = ({ navigation }) => {
     const unsubscribe = navigation.addListener('focus', checkGratitudeToday);
     return unsubscribe;
   }, [navigation, checkGratitudeToday]);
+
+  // Cargar insignias cuando se enfoca la pantalla
+  useEffect(() => {
+    loadRecentBadges();
+    const unsubscribe = navigation.addListener('focus', loadRecentBadges);
+    return unsubscribe;
+  }, [navigation, loadRecentBadges]);
 
   const moods = [
     { label: 'Excelente',    emoji: '😊' },
@@ -178,7 +251,7 @@ const DashboardScreen = ({ navigation }) => {
           <View style={styles.actionCardsContainer}>
             <TouchableOpacity 
               style={[styles.actionCard, styles.primaryActionCard]}
-              onPress={() => navigation.navigate('ClassList')}
+          onPress={() => navigation.navigate('ClassList')}
             >
               <View style={styles.cardIcon}>
                 <Text style={styles.cardIconText}>📚</Text>
@@ -192,44 +265,8 @@ const DashboardScreen = ({ navigation }) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.actionCard, styles.secondaryActionCard]}
-              onPress={() => navigation.navigate('StudentList')}
-            >
-              <View style={styles.cardIcon}>
-                <Text style={styles.cardIconText}>👥</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Estudiantes</Text>
-                <Text style={styles.cardSubtitle}>Ver progreso</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <Text style={styles.cardArrowText}>→</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
-      {/* Sección de Unirse a Clase - Solo para estudiantes - MÁS COMPACTA */}
-      {user?.role === 'student' && (
-        <View style={styles.studentSection}>
-          <Text style={styles.sectionLabel}>🚀 Tu aventura de aprendizaje</Text>
-          <TouchableOpacity 
-            style={[styles.actionCard, styles.studentActionCardCompact]}
-            onPress={() => navigation.navigate('JoinClass')}
-          >
-            <View style={styles.cardIconSmall}>
-              <Text style={styles.cardIconTextSmall}>🎯</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitleSmall}>Únete a una Clase</Text>
-              <Text style={styles.cardSubtitleSmall}>Conecta con tu profesor</Text>
-            </View>
-            <View style={styles.cardArrowSmall}>
-              <Text style={styles.cardArrowTextSmall}>→</Text>
-            </View>
-          </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -243,8 +280,8 @@ const DashboardScreen = ({ navigation }) => {
     }
 
     return (
-      <View>
-        {item.type === 'moods' && (
+    <View>
+      {item.type === 'moods' && (
           <View style={styles.moodSection}>
             <View style={styles.moodHeaderContainer}>
               <Text style={styles.moodTitle}>¿Cómo te sientes hoy?</Text>
@@ -253,27 +290,27 @@ const DashboardScreen = ({ navigation }) => {
             
             <View style={styles.moodGridContainer}>
               {moods.map((mood, index) => (
-                <TouchableOpacity
-                  key={mood.label}
+              <TouchableOpacity
+                key={mood.label}
                   style={[
                     styles.moodButton,
                     { backgroundColor: getMoodColor(index) }
                   ]}
-                  onPress={() =>
-                    navigation.navigate('EmotionSelection', { mood: mood.label })
-                  }
-                >
-                  <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                onPress={() =>
+                  navigation.navigate('EmotionSelection', { mood: mood.label })
+                }
+              >
+                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
                   <Text style={styles.moodLabel}>{mood.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
             {/* BOTÓN DE HISTORIAL TEMPORALMENTE OCULTO
             <View style={styles.moodActionContainer}>
               <TouchableOpacity 
                 style={styles.historyButtonCompact}
-                onPress={() => navigation.navigate('MoodHistory')}
+            onPress={() => navigation.navigate('MoodHistory')}
               >
                 <View style={styles.historyButtonIconSmall}>
                   <Text style={styles.historyButtonIconTextSmall}>📊</Text>
@@ -288,30 +325,30 @@ const DashboardScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
             */}
-          </View>
-        )}
-        {item.type === 'learningPaths' && (
+        </View>
+      )}
+      {item.type === 'learningPaths' && (
           <View style={styles.learningSection}>
             <View style={styles.learningHeaderContainer}>
               <Text style={styles.learningTitle}>🎯 Rutas de Aprendizaje</Text>
               <Text style={styles.learningSubtitle}>Descubre nuevas formas de crecer y aprender</Text>
             </View>
             
-            <FlatList
-              data={learningPaths}
-              keyExtractor={path => path._id}
-              numColumns={2}
+          <FlatList
+            data={learningPaths}
+            keyExtractor={path => path._id}
+            numColumns={2}
               columnWrapperStyle={styles.pathColumnWrapper}
               renderItem={({ item: path, index }) => (
-                <TouchableOpacity
+              <TouchableOpacity
                   style={[
                     styles.modernPathCard,
                     { backgroundColor: getPathCardColor(index) }
                   ]}
-                  onPress={() =>
-                    navigation.navigate('LearningPathDetail', { path })
-                  }
-                >
+                onPress={() =>
+                  navigation.navigate('LearningPathDetail', { path })
+                }
+              >
                   <View style={styles.pathCardHeader}>
                     <View style={styles.pathIconContainer}>
                       <Text style={styles.pathIcon}>{getPathIcon(index)}</Text>
@@ -325,8 +362,8 @@ const DashboardScreen = ({ navigation }) => {
                     <Text style={styles.modernPathTitle}>{path.title}</Text>
                     {/* DESCRIPCIÓN TEMPORALMENTE OCULTA
                     <Text style={styles.modernPathDescription}>
-                      {path.description}
-                    </Text>
+                  {path.description}
+                </Text>
                     */}
                   </View>
                   
@@ -341,15 +378,15 @@ const DashboardScreen = ({ navigation }) => {
                       <Text style={styles.pathArrowText}>→</Text>
                     </View>
                   </View>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
                 <View style={styles.emptyPathsContainer}>
                   <Text style={styles.emptyPathsEmoji}>📚</Text>
                   <Text style={styles.emptyPathsTitle}>¡Próximamente!</Text>
                   <Text style={styles.emptyPathsText}>
                     Estamos preparando rutas increíbles para ti
-                  </Text>
+              </Text>
                 </View>
               }
             />
@@ -357,7 +394,7 @@ const DashboardScreen = ({ navigation }) => {
             <View style={styles.exploreMoreContainer}>
               <TouchableOpacity 
                 style={styles.exploreMoreButtonCompact}
-                onPress={() => navigation.navigate('LearningPaths')}
+            onPress={() => navigation.navigate('LearningPaths')}
               >
                 <View style={styles.exploreMoreIconSmall}>
                   <Text style={styles.exploreMoreIconTextSmall}>🌟</Text>
@@ -370,9 +407,9 @@ const DashboardScreen = ({ navigation }) => {
                 </View>
               </TouchableOpacity>
             </View>
-          </View>
-        )}
-        {item.type === 'gratitude' && (
+        </View>
+      )}
+      {item.type === 'gratitude' && (
           <View style={styles.gratitudeSection}>
             <View style={styles.gratitudeHeaderContainer}>
               <Text style={styles.gratitudeTitle}>✨ Mi Diario de Gratitud</Text>
@@ -383,7 +420,7 @@ const DashboardScreen = ({ navigation }) => {
               <View style={styles.reminderCard}>
                 <Text style={styles.reminderText}>
                   ¡Hey! Aún no has registrado tu gratitud hoy 🌈
-                </Text>
+          </Text>
               </View>
             )}
             
@@ -404,17 +441,109 @@ const DashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         )}
-      </View>
-    );
+        {item.type === 'badges' && (
+          <View style={styles.badgesSection}>
+            <View style={styles.badgesHeaderContainer}>
+              <Text style={styles.badgesTitle}>🏆 Mis Insignias</Text>
+              <Text style={styles.badgesSubtitle}>Logros desbloqueados por tu gratitud</Text>
+            </View>
+            
+            {recentBadges.length > 0 ? (
+              <View>
+                <View style={styles.badgesStatsContainer}>
+                  <View style={styles.badgeStatCard}>
+                    <Text style={styles.badgeStatNumber}>{badgeStats.totalBadges || 0}</Text>
+                    <Text style={styles.badgeStatLabel}>Desbloqueadas</Text>
+                  </View>
+                  <View style={styles.badgeStatCard}>
+                    <Text style={styles.badgeStatNumber}>{badgeStats.currentStreak || 0}</Text>
+                    <Text style={styles.badgeStatLabel}>Racha Actual</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.recentBadgesContainer}>
+                  {recentBadges.map((badge, index) => (
+                    <BadgeCard
+                      key={badge.id || index}
+                      badge={badge}
+                      size="small"
+                      onPress={() => {
+                        showCustomModal({
+                          title: badge.name,
+                          message: `${badge.description}\n\n¡Felicidades por desbloquear esta insignia!`,
+                          emoji: badge.emoji,
+                          buttonText: '¡Genial! ✨'
+                        });
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.noBadgesContainer}>
+                <Text style={styles.noBadgesEmoji}>🌱</Text>
+                <Text style={styles.noBadgesTitle}>¡Tu primera insignia te espera!</Text>
+                <Text style={styles.noBadgesText}>
+                  Escribe tu primera entrada de gratitud para comenzar a desbloquear insignias
+              </Text>
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.viewAllBadgesButton}
+              onPress={() => navigation.navigate('Badges')}
+            >
+              <View style={styles.viewAllBadgesIcon}>
+                <Text style={styles.viewAllBadgesIconText}>🎯</Text>
+              </View>
+              <View style={styles.viewAllBadgesContent}>
+                <Text style={styles.viewAllBadgesTitle}>Ver Todas las Insignias</Text>
+                <Text style={styles.viewAllBadgesSubtitle}>Explora tu colección completa</Text>
+              </View>
+              <View style={styles.viewAllBadgesArrow}>
+                <Text style={styles.viewAllBadgesArrowText}>→</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+        {item.type === 'joinClass' && (
+          <View style={styles.joinClassSection}>
+            <View style={styles.joinClassHeaderContainer}>
+              <Text style={styles.joinClassTitle}>🚀 Tu aventura de aprendizaje</Text>
+              <Text style={styles.joinClassSubtitle}>Conecta con tu profesor y únete a una clase</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={[styles.actionCard, styles.studentActionCardCompact]}
+              onPress={() => navigation.navigate('JoinClass')}
+            >
+              <View style={styles.cardIconSmall}>
+                <Text style={styles.cardIconTextSmall}>🎯</Text>
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitleSmall}>Únete a una Clase</Text>
+                <Text style={styles.cardSubtitleSmall}>Conecta con tu profesor</Text>
+              </View>
+              <View style={styles.cardArrowSmall}>
+                <Text style={styles.cardArrowTextSmall}>→</Text>
+              </View>
+            </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
   };
 
   const data = [
     { type: 'moods' },
     { type: 'learningPaths' },
     { type: 'gratitude' },
+    { type: 'badges' },
+    { type: 'joinClass' },
   ];
 
   return (
+    <View style={{ flex: 1 }}>
     <FlatList
       ListHeaderComponent={renderHeader}           // <-- aquí inyectamos el header
       data={data}
@@ -422,6 +551,27 @@ const DashboardScreen = ({ navigation }) => {
       keyExtractor={(_, index) => index.toString()}
       contentContainerStyle={styles.container}
     />
+      
+      {/* Modal de notificación de nueva insignia */}
+      <BadgeNotificationModal
+        visible={newBadgeModal.visible}
+        badge={newBadgeModal.badge}
+        onClose={() => setNewBadgeModal({ visible: false, badge: null })}
+        onViewAllBadges={() => navigation.navigate('Badges')}
+      />
+      
+      {/* Modal personalizado para mensajes */}
+      <CustomModal
+        visible={customModal.visible}
+        title={customModal.title}
+        message={customModal.message}
+        emoji={customModal.emoji}
+        buttonText={customModal.buttonText}
+        onClose={hideCustomModal}
+      />
+      
+      <TutorialDebug />
+    </View>
   );
 };
 
@@ -443,19 +593,19 @@ const styles = StyleSheet.create({
   moodButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 55,
-    height: 65,
+    width: 50,
+    height: 58,
     borderRadius: modernTheme.borderRadius.medium,
     marginHorizontal: 2,
     paddingVertical: modernTheme.spacing.paddingTiny,
     ...modernTheme.shadows.small,
   },
   moodEmoji: {
-    fontSize: 24,
+    fontSize: 22,
     marginBottom: 3,
   },
   moodLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
     color: modernTheme.colors.chartBackground,
     textAlign: 'center',
@@ -731,48 +881,48 @@ const styles = StyleSheet.create({
     marginBottom: modernTheme.spacing.marginMedium,
   },
   modernPathCard: {
-    padding: modernTheme.spacing.paddingSmall,
+    padding: 10,
     borderRadius: modernTheme.borderRadius.medium,
     marginBottom: modernTheme.spacing.marginSmall,
     flex: 1,
     marginHorizontal: 5,
-    minHeight: 120,
+    minHeight: 108,
     ...modernTheme.shadows.medium,
   },
   pathCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: modernTheme.spacing.marginSmall,
+    marginBottom: 8,
   },
   pathIconContainer: {
-    width: 35,
-    height: 35,
+    width: 32,
+    height: 32,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: modernTheme.borderRadius.small,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pathIcon: {
-    fontSize: 18,
+    fontSize: 16,
   },
   pathCardBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: modernTheme.spacing.paddingSmall,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: modernTheme.borderRadius.small,
   },
   pathCardBadgeText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '700',
     color: modernTheme.colors.primaryText,
   },
   pathCardContent: {
     flex: 1,
-    marginBottom: modernTheme.spacing.marginSmall,
+    marginBottom: 8,
   },
   modernPathTitle: {
-    fontSize: modernTheme.fontSizes.caption,
+    fontSize: 11,
     fontWeight: '700',
     color: modernTheme.colors.chartBackground,
     marginBottom: modernTheme.spacing.marginTiny,
@@ -847,30 +997,30 @@ const styles = StyleSheet.create({
   },
   exploreMoreButtonCompact: {
     backgroundColor: modernTheme.colors.turquoise,
-    padding: modernTheme.spacing.paddingSmall,
+    padding: 12,
     borderRadius: modernTheme.borderRadius.medium,
     flexDirection: 'row',
     alignItems: 'center',
-    width: '80%',
+    width: '82%',
     ...modernTheme.shadows.small,
   },
   exploreMoreIconSmall: {
-    width: 32,
-    height: 32,
+    width: 33,
+    height: 33,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: modernTheme.borderRadius.small,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: modernTheme.spacing.marginSmall,
+    marginRight: 10,
   },
   exploreMoreIconTextSmall: {
-    fontSize: 20,
+    fontSize: 18,
   },
   exploreMoreContent: {
     flex: 1,
   },
   exploreMoreTitleSmall: {
-    fontSize: modernTheme.fontSizes.body,
+    fontSize: 15,
     fontWeight: '700',
     color: modernTheme.colors.chartBackground,
   },
@@ -883,7 +1033,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exploreMoreArrowTextSmall: {
-    fontSize: modernTheme.fontSizes.body,
+    fontSize: 14,
     fontWeight: '700',
     color: modernTheme.colors.chartBackground,
   },
@@ -997,6 +1147,135 @@ const styles = StyleSheet.create({
     fontSize: modernTheme.fontSizes.body,
     fontWeight: '700',
     color: modernTheme.colors.chartBackground,
+  },
+  badgesSection: {
+    marginBottom: modernTheme.spacing.marginXLarge,
+    alignItems: 'center',
+  },
+  badgesHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  badgesTitle: {
+    fontSize: modernTheme.fontSizes.subtitle,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  badgesSubtitle: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+  },
+  badgesStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  badgeStatCard: {
+    alignItems: 'center',
+  },
+  badgeStatNumber: {
+    fontSize: modernTheme.fontSizes.subtitle,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  badgeStatLabel: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
+  },
+  recentBadgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  noBadgesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noBadgesEmoji: {
+    fontSize: 48,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  noBadgesTitle: {
+    fontSize: modernTheme.fontSizes.subtitle,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  noBadgesText: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
+    paddingHorizontal: modernTheme.spacing.paddingMedium,
+  },
+  viewAllBadgesButton: {
+    backgroundColor: modernTheme.colors.turquoise,
+    padding: 8,
+    borderRadius: modernTheme.borderRadius.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '60%',
+    ...modernTheme.shadows.small,
+  },
+  viewAllBadgesIcon: {
+    width: 24,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: modernTheme.borderRadius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  viewAllBadgesIconText: {
+    fontSize: 14,
+  },
+  viewAllBadgesContent: {
+    flex: 1,
+  },
+  viewAllBadgesTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: modernTheme.colors.chartBackground,
+  },
+  viewAllBadgesSubtitle: {
+    fontSize: 10,
+    color: modernTheme.colors.secondaryText,
+  },
+  viewAllBadgesArrow: {
+    width: 22,
+    height: 22,
+    backgroundColor: modernTheme.colors.turquoise,
+    borderRadius: modernTheme.borderRadius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewAllBadgesArrowText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: modernTheme.colors.chartBackground,
+  },
+  joinClassSection: {
+    marginBottom: modernTheme.spacing.marginXLarge,
+    alignItems: 'center',
+  },
+  joinClassHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  joinClassTitle: {
+    fontSize: modernTheme.fontSizes.subtitle,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginSmall,
+  },
+  joinClassSubtitle: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
+    textAlign: 'center',
   },
 });
 

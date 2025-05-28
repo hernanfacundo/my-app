@@ -13,19 +13,27 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import config from '../config';
 import modernTheme from './modernTheme';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 const JoinClassScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [classCode, setClassCode] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const handleJoinClass = async () => {
     if (!classCode.trim()) {
-      Alert.alert('¡Oops! 📝', 'Por favor ingresa el código de la clase para continuar');
+      showModal({
+        title: '¡Oops! 📝',
+        message: 'Por favor ingresa el código de la clase para continuar',
+        emoji: '📝',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     try {
       const response = await axios.post(
         `${config.API_BASE_URL}/classes/${classCode}/join`,
@@ -35,114 +43,122 @@ const JoinClassScreen = ({ navigation }) => {
         }
       );
 
-      Alert.alert(
-        '¡Genial! 🎉',
-        'Te has unido a la clase correctamente. ¡Bienvenido!',
-        [
-          {
-            text: 'Ver mis clases',
-            onPress: () => navigation.navigate('ClassList')
-          }
-        ]
-      );
+      console.log('Respuesta del servidor:', response.data);
+      
+      showModal({
+        title: '¡Bienvenido! 🎉',
+        message: `Te has unido exitosamente a la clase "${response.data.data.className}". ¡Comienza tu aventura de aprendizaje!`,
+        emoji: '🎉',
+        buttonText: '¡Genial!'
+      });
+      
+      setClassCode('');
+      navigation.navigate('Dashboard');
     } catch (error) {
       console.error('Error al unirse a la clase:', error);
-      let errorMessage = 'No se pudo unir a la clase';
-      let errorEmoji = '😕';
       
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = 'El código de clase no existe. ¿Verificaste que esté correcto?';
-          errorEmoji = '🔍';
-        } else if (error.response.status === 400) {
-          errorMessage = 'Ya estás inscrito en esta clase. ¡Qué bueno!';
-          errorEmoji = '✅';
-        } else if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      }
+      const errorMessage = error.response?.data?.message || 'No pudimos unirte a la clase. ¿Verificaste el código?';
+      const errorEmoji = error.response?.status === 404 ? '🔍' : 
+                        error.response?.status === 409 ? '👥' : '😕';
       
-      Alert.alert(`${errorEmoji} Información`, errorMessage);
+      showModal({
+        title: `${errorEmoji} Información`,
+        message: errorMessage,
+        emoji: errorEmoji,
+        buttonText: 'Intentar de nuevo'
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header juvenil */}
-      <View style={styles.header}>
-        <Text style={styles.headerEmoji}>🎓</Text>
-        <Text style={styles.title}>¡Únete a una clase!</Text>
-        <Text style={styles.subtitle}>Conecta con tu profesor y compañeros</Text>
-      </View>
-
-      {/* Botón para ver clases actuales */}
-      <TouchableOpacity
-        style={styles.myClassesButton}
-        onPress={() => navigation.navigate('ClassList')}
-      >
-        <View style={styles.buttonContent}>
-          <Text style={styles.buttonEmoji}>📚</Text>
-          <View style={styles.buttonTextContainer}>
-            <Text style={styles.buttonTitle}>Ver mis clases</Text>
-            <Text style={styles.buttonSubtitle}>Revisa tus clases actuales</Text>
-          </View>
-          <Text style={styles.buttonArrow}>→</Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Header juvenil */}
+        <View style={styles.header}>
+          <Text style={styles.headerEmoji}>🎓</Text>
+          <Text style={styles.title}>¡Únete a una clase!</Text>
+          <Text style={styles.subtitle}>Conecta con tu profesor y compañeros</Text>
         </View>
-      </TouchableOpacity>
 
-      {/* Tarjeta de instrucciones */}
-      <View style={styles.instructionsCard}>
-        <Text style={styles.instructionsTitle}>📋 ¿Cómo funciona?</Text>
-        <View style={styles.stepContainer}>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>1</Text>
-            <Text style={styles.stepText}>Pide el código a tu profesor</Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>2</Text>
-            <Text style={styles.stepText}>Escríbelo en el campo de abajo</Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>3</Text>
-            <Text style={styles.stepText}>¡Presiona unirse y listo!</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Formulario de código */}
-      <View style={styles.formContainer}>
-        <Text style={styles.inputLabel}>🔑 Código de la clase</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: ABC123 o MATE2024"
-          placeholderTextColor={modernTheme.colors.secondaryText}
-          value={classCode}
-          onChangeText={setClassCode}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={10}
-        />
-        
+        {/* Botón para ver clases actuales */}
         <TouchableOpacity
-          style={[styles.joinButton, isLoading && styles.buttonDisabled]}
-          onPress={handleJoinClass}
-          disabled={isLoading}
+          style={styles.myClassesButton}
+          onPress={() => navigation.navigate('ClassList')}
         >
-          <Text style={styles.joinButtonText}>
-            {isLoading ? '⏳ Uniéndome...' : '🚀 ¡Unirme a la clase!'}
-          </Text>
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonEmoji}>📚</Text>
+            <View style={styles.buttonTextContainer}>
+              <Text style={styles.buttonTitle}>Ver mis clases</Text>
+              <Text style={styles.buttonSubtitle}>Revisa tus clases actuales</Text>
+            </View>
+            <Text style={styles.buttonArrow}>→</Text>
+          </View>
         </TouchableOpacity>
-      </View>
 
-      {/* Footer motivacional */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          💡 Tip: Los códigos de clase suelen tener entre 4-8 caracteres
-        </Text>
-      </View>
-    </ScrollView>
+        {/* Tarjeta de instrucciones */}
+        <View style={styles.instructionsCard}>
+          <Text style={styles.instructionsTitle}>📋 ¿Cómo funciona?</Text>
+          <View style={styles.stepContainer}>
+            <View style={styles.step}>
+              <Text style={styles.stepNumber}>1</Text>
+              <Text style={styles.stepText}>Pide el código a tu profesor</Text>
+            </View>
+            <View style={styles.step}>
+              <Text style={styles.stepNumber}>2</Text>
+              <Text style={styles.stepText}>Escríbelo en el campo de abajo</Text>
+            </View>
+            <View style={styles.step}>
+              <Text style={styles.stepNumber}>3</Text>
+              <Text style={styles.stepText}>¡Presiona unirse y listo!</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Formulario de código */}
+        <View style={styles.formContainer}>
+          <Text style={styles.inputLabel}>🔑 Código de la clase</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ej: ABC123 o MATE2024"
+            placeholderTextColor={modernTheme.colors.secondaryText}
+            value={classCode}
+            onChangeText={setClassCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={10}
+          />
+          
+          <TouchableOpacity
+            style={[styles.joinButton, loading && styles.buttonDisabled]}
+            onPress={handleJoinClass}
+            disabled={loading}
+          >
+            <Text style={styles.joinButtonText}>
+              {loading ? '⏳ Uniéndome...' : '🚀 ¡Unirme a la clase!'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer motivacional */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            💡 Tip: Los códigos de clase suelen tener entre 4-8 caracteres
+          </Text>
+        </View>
+      </ScrollView>
+      
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
+    </View>
   );
 };
 

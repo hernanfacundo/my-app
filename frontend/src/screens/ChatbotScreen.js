@@ -4,54 +4,129 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import modernTheme from './modernTheme';
 import config from '../config';
+import ContextAnalysisService from '../services/ContextAnalysisService';
 
 const ChatbotScreen = ({ navigation, route }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const flatListRef = useRef(null);
-  const initialMessage = route.params?.analysis || 'Hola, soy tu amigo virtual. Estoy acá para charlar sobre cómo te sentís. ¿Qué tenés en mente?';
 
   useEffect(() => {
-    (async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const res = await axios.get(
-          `${config.API_BASE_URL}/chat-conversations`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.data.messages?.length) {
-          setMessages(res.data.messages.map((m, i) => ({
-            id: i.toString(),
-            text: m.content,
-            sender: m.sender,
-            timestamp: new Date()
-          })));
-          return;
-        }
-      } catch (e) { /* Silenciar error si no hay historial */ }
+    initializeChat();
+  }, []);
+
+  const initializeChat = async () => {
+    try {
+      setIsInitializing(true);
       
-      // Si no hay historial, usamos initialPrompt o el saludo genérico
-      const prompt = route.params?.initialPrompt
-        ?? 'Hola, soy tu acompañante emocional 🤗 Estoy aquí para escucharte y ayudarte a reflexionar. ¿En qué quieres profundizar hoy?';
+      // 1. Intentar cargar historial existente
+      const existingMessages = await loadExistingConversation();
+      if (existingMessages && existingMessages.length > 0) {
+        setMessages(existingMessages);
+        setIsInitializing(false);
+        return;
+      }
+
+      // 2. Determinar mensaje inicial basado en contexto
+      const initialMessage = await determineInitialMessage();
+      
       setMessages([{ 
         id: '0', 
-        text: prompt, 
+        text: initialMessage.prompt, 
+        sender: 'bot',
+        timestamp: new Date(),
+        contextType: initialMessage.type
+      }]);
+
+    } catch (error) {
+      console.error('Error inicializando chat:', error);
+      // Fallback al mensaje genérico original
+      setMessages([{ 
+        id: '0', 
+        text: 'Hola, soy tu acompañante emocional 🤗 Estoy aquí para escucharte y ayudarte a reflexionar. ¿En qué quieres profundizar hoy?', 
         sender: 'bot',
         timestamp: new Date()
       }]);
-    })();
-  }, [initialMessage]);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  const loadExistingConversation = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return null;
+
+      const res = await axios.get(
+        `${config.API_BASE_URL}/chat-conversations`,
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+      
+      if (res.data.messages?.length) {
+        return res.data.messages.map((m, i) => ({
+          id: i.toString(),
+          text: m.content,
+          sender: m.sender,
+          timestamp: new Date(m.timestamp || new Date())
+        }));
+      }
+      return null;
+    } catch (error) {
+      console.log('No hay historial previo o error cargándolo:', error.message);
+      return null;
+    }
+  };
+
+  const determineInitialMessage = async () => {
+    // 1. Prioridad: Parámetros pasados desde otras pantallas (mantener funcionalidad existente)
+    if (route.params?.analysis) {
+      return {
+        type: 'EXTERNAL_ANALYSIS',
+        prompt: route.params.analysis
+      };
+    }
+
+    if (route.params?.initialPrompt) {
+      return {
+        type: 'EXTERNAL_PROMPT', 
+        prompt: route.params.initialPrompt
+      };
+    }
+
+    // 2. Si viene con datos específicos de mood
+    if (route.params?.moodData && route.params?.analysis) {
+      return ContextAnalysisService.generateMoodFollowUpContext(
+        route.params.moodData, 
+        route.params.analysis
+      );
+    }
+
+    // 3. Si viene con datos específicos de gratitud
+    if (route.params?.gratitudeData && route.params?.reflection) {
+      return ContextAnalysisService.generateGratitudeFollowUpContext(
+        route.params.gratitudeData, 
+        route.params.reflection
+      );
+    }
+
+    // 4. Generar contexto inteligente basado en historial del usuario
+    return await ContextAnalysisService.getContextualAnalysis();
+  };
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !isInitializing) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messages]);
+  }, [messages, isInitializing]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -114,7 +189,7 @@ const ChatbotScreen = ({ navigation, route }) => {
           messages: messages.map(m => ({
             content: m.text,
             sender: m.sender,
-            timestamp: new Date()
+            timestamp: m.timestamp || new Date()
           }))
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -151,8 +226,24 @@ const ChatbotScreen = ({ navigation, route }) => {
     });
   };
 
+  const getContextIcon = (contextType) => {
+    const icons = {
+      'MOOD_CONTEXT': '😊',
+      'GRATITUDE_CONTEXT': '✨',
+      'MOOD_FOLLOW_UP': '💭',
+      'GRATITUDE_FOLLOW_UP': '🙏',
+      'RETURNING_USER': '👋',
+      'NEW_USER': '🌟',
+      'EXTERNAL_ANALYSIS': '📊',
+      'EXTERNAL_PROMPT': '💬'
+    };
+    return icons[contextType] || '🤖';
+  };
+
   const renderMessage = ({ item }) => {
     const isBot = item.sender === 'bot';
+    const contextIcon = isBot && item.contextType ? getContextIcon(item.contextType) : null;
+    
     return (
       <View style={[
         styles.messageContainer,
@@ -162,7 +253,11 @@ const ChatbotScreen = ({ navigation, route }) => {
           styles.messageBubble,
           isBot ? styles.botMessage : styles.userMessage
         ]}>
-          {isBot && <Text style={styles.botEmoji}>🤖</Text>}
+          {isBot && (
+            <Text style={styles.botEmoji}>
+              {contextIcon || '🤖'}
+            </Text>
+          )}
           <Text style={[
             styles.messageText,
             isBot ? styles.botMessageText : styles.userMessageText
@@ -197,6 +292,21 @@ const ChatbotScreen = ({ navigation, route }) => {
     );
   };
 
+  const renderInitializingIndicator = () => {
+    if (!isInitializing) return null;
+    return (
+      <View style={styles.initializingContainer}>
+        <Text style={styles.initializingEmoji}>🧠</Text>
+        <Text style={styles.initializingText}>Preparando nuestra conversación...</Text>
+        <View style={styles.typingDots}>
+          <View style={[styles.dot, styles.dot1]} />
+          <View style={[styles.dot, styles.dot2]} />
+          <View style={[styles.dot, styles.dot3]} />
+        </View>
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -208,13 +318,17 @@ const ChatbotScreen = ({ navigation, route }) => {
           <Text style={styles.headerEmoji}>🤖</Text>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>Tu Acompañante Emocional</Text>
-            <Text style={styles.headerSubtitle}>Siempre aquí para escucharte</Text>
+            <Text style={styles.headerSubtitle}>
+              {isInitializing ? 'Preparando conversación...' : 'Siempre aquí para escucharte'}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => {
-            saveConversation();
+            if (messages.length > 1) { // Solo guardar si hay conversación real
+              saveConversation();
+            }
             navigation.goBack();
           }}
         >
@@ -231,6 +345,7 @@ const ChatbotScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
         ListFooterComponent={renderTypingIndicator}
+        ListEmptyComponent={renderInitializingIndicator}
       />
 
       {/* Input de mensaje */}
@@ -242,14 +357,14 @@ const ChatbotScreen = ({ navigation, route }) => {
             onChangeText={setInput}
             placeholder="Escribe tu mensaje..."
             placeholderTextColor={modernTheme.colors.secondaryText}
-            editable={!isLoading}
+            editable={!isLoading && !isInitializing}
             multiline
             maxLength={500}
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
+            style={[styles.sendButton, (!input.trim() || isLoading || isInitializing) && styles.sendButtonDisabled]}
             onPress={sendMessage}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isInitializing}
           >
             <Text style={styles.sendButtonText}>
               {isLoading ? '⏳' : '📤'}
@@ -401,6 +516,22 @@ const styles = StyleSheet.create({
   },
   dot3: {
     opacity: 1,
+  },
+  initializingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: modernTheme.spacing.paddingXLarge,
+  },
+  initializingEmoji: {
+    fontSize: 48,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  initializingText: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    marginBottom: modernTheme.spacing.marginMedium,
+    textAlign: 'center',
   },
   inputContainer: {
     paddingHorizontal: modernTheme.spacing.paddingMedium,

@@ -22,10 +22,33 @@ const modernTheme = {
     error: '#FF7F7F', // Coral para errores
     info: '#B39DDB', // Lavanda para información
     
+    // Colores adicionales para insignias
+    background: '#F7FAFC', // Fondo principal
+    white: '#FFFFFF', // Blanco puro
+    darkGray: '#3C3C3C', // Gris oscuro
+    mediumGray: '#707070', // Gris medio
+    lightGray: '#E2E8F0', // Gris claro
+    
     // Compatibilidad con tema anterior (para transición gradual)
     accent: '#5CD6C2', // Mapeo del accent anterior al turquesa
     primary: '#5CD6C2', // Color primario
     secondary: '#FF7F7F', // Color secundario
+  },
+  
+  // Tipografía moderna
+  fonts: {
+    regular: 'System',
+    medium: 'System',
+    semiBold: 'System',
+    bold: 'System',
+  },
+  
+  typography: {
+    largeTitle: { fontSize: 32, fontWeight: 'bold' },
+    title: { fontSize: 24, fontWeight: 'bold' },
+    subtitle: { fontSize: 18, fontWeight: '600' },
+    body: { fontSize: 16, fontWeight: 'normal' },
+    caption: { fontSize: 12, fontWeight: 'normal' },
   },
   
   fontSizes: {
@@ -41,6 +64,7 @@ const modernTheme = {
   
   spacing: {
     // Espaciado más generoso y moderno
+    paddingTiny: 4,
     paddingSmall: 8,
     padding: 16,
     paddingMedium: 20,
@@ -53,6 +77,13 @@ const modernTheme = {
     marginLarge: 24,
     marginXLarge: 32,
     marginXXLarge: 40,
+    
+    // Espaciado adicional para insignias
+    extraSmall: 4,
+    small: 8,
+    medium: 16,
+    large: 24,
+    extraLarge: 32,
   },
   
   borderRadius: {

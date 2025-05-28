@@ -81,7 +81,7 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ message: 'Email, contraseña y nombre son requeridos' });
     }
 
-    const validRoles = ['student', 'teacher', 'admin'];
+    const validRoles = ['student', 'teacher', 'admin', 'directivo'];
     const userRole = role && validRoles.includes(role) ? role : 'student';
 
     const existingUser = await User.findOne({ email });
@@ -266,8 +266,42 @@ app.post('/api/gratitude', authenticateToken, async (req, res) => {
     const { text } = req.body;
     const userId   = req.user.id;
     const date     = new Date();
+    
+    console.log(`📝 [Gratitude] Nueva entrada de gratitud para usuario ${userId}:`, text.substring(0, 100) + '...');
+    
     const newGratitude = new GratitudeEntry({ userId, text, date });
     await newGratitude.save();
+    
+    console.log(`✅ [Gratitude] Entrada guardada con ID: ${newGratitude._id}`);
+    
+    // ——— NUEVO: Sistema de Insignias ———
+    let newBadges = [];
+    try {
+      console.log('🏆 [Gratitude] Iniciando procesamiento de insignias...');
+      const BadgeService = require('./services/badgeService');
+      
+      // Obtener todas las entradas del usuario para calcular progreso
+      const allUserEntries = await GratitudeEntry.find({ userId }).sort({ date: 1 });
+      console.log(`📊 [Gratitude] Total de entradas del usuario: ${allUserEntries.length}`);
+      
+      // Actualizar progreso del usuario
+      const progress = await BadgeService.updateUserProgress(userId, newGratitude, allUserEntries);
+      
+      // Verificar nuevas insignias
+      newBadges = await BadgeService.checkForNewBadges(userId, progress);
+      
+      if (newBadges.length > 0) {
+        console.log(`🎉 [Gratitude] ¡${newBadges.length} nuevas insignias desbloqueadas!`);
+        newBadges.forEach(badge => {
+          console.log(`   🏅 ${badge.emoji} ${badge.name} - ${badge.description}`);
+        });
+      } else {
+        console.log('📝 [Gratitude] No se desbloquearon nuevas insignias en esta entrada');
+      }
+      
+    } catch (badgeError) {
+      console.error('❌ [Gratitude] Error en sistema de insignias (no crítico):', badgeError);
+    }
     
     // ——— Memoria episódica: últimas 5 entradas ———
     const recent = await GratitudeEntry
@@ -311,13 +345,20 @@ Usuario acaba de decir: " ${text} "
     );
     const questions = openaiRes.data.choices[0].message.content.trim();
 
-    // ——— Devolvemos la entrada  las preguntas ———
-    return res.status(201).json({
+    console.log(`💬 [Gratitude] Respuesta de OpenAI generada (${questions.length} caracteres)`);
+
+    // ——— Devolvemos la entrada, las preguntas Y las nuevas insignias ———
+    const response = {
       message:  'Gratitud guardada',
       data:     newGratitude,
-      reflect:  questions
-    });
+      reflect:  questions,
+      newBadges: newBadges  // NUEVO: incluir insignias desbloqueadas
+    };
+    
+    console.log(`🚀 [Gratitude] Respuesta enviada con ${newBadges.length} insignias nuevas`);
+    return res.status(201).json(response);
   } catch (error) {
+    console.error('❌ [Gratitude] Error al guardar gratitud:', error);
     res.status(500).json({ message: 'Error al guardar gratitud', error: error.message });
   }
 });
@@ -731,6 +772,15 @@ Mantén un tono profesional pero empático, y enfócate en acciones prácticas.`
     });
   }
 });
+
+// ——— RUTAS DE INSIGNIAS ———
+const createBadgeRoutes = require('./routes/badgeRoutes');
+const badgeRoutes = createBadgeRoutes(authenticateToken);
+app.use('/api/badges', badgeRoutes);
+
+// ——— RUTAS DE DIRECTIVO ———
+const directivoRoutes = require('./routes/directivo.routes');
+app.use('/api/directivo', directivoRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));

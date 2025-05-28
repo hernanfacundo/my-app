@@ -4,23 +4,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import modernTheme from './modernTheme';
 import config from '../config';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 const GratitudeHistoryScreen = ({ navigation }) => {
   const [gratitudeEntries, setGratitudeEntries] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const fetchGratitudeEntries = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
       } else {
-        setIsLoading(true);
+        setLoading(true);
       }
 
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        Alert.alert('Sesión expirada 🔐', 'Por favor, inicia sesión nuevamente para continuar');
+        showModal({
+          title: 'Sesión expirada 🔐',
+          message: 'Por favor, inicia sesión nuevamente para continuar',
+          emoji: '🔐',
+          buttonText: 'Ir a inicio'
+        });
         navigation.navigate('SignIn');
         return;
       }
@@ -33,10 +41,15 @@ const GratitudeHistoryScreen = ({ navigation }) => {
       setGratitudeEntries(response.data.data || []);
     } catch (error) {
       console.error('Error al cargar el historial:', error.response?.data || error.message);
-      Alert.alert('Error al cargar 📚', 'No pudimos cargar tu historial de gratitud. ¿Intentas de nuevo?');
+      showModal({
+        title: 'Error al cargar 📚',
+        message: 'No pudimos cargar tu historial de gratitud. ¿Intentas de nuevo?',
+        emoji: '📚',
+        buttonText: 'Intentar de nuevo'
+      });
       setGratitudeEntries([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -178,7 +191,7 @@ const GratitudeHistoryScreen = ({ navigation }) => {
         renderItem={renderGratitudeEntry}
         keyExtractor={(item) => item._id}
         ListHeaderComponent={gratitudeEntries.length > 0 ? renderHeader : null}
-        ListEmptyComponent={!isLoading ? renderEmptyState : null}
+        ListEmptyComponent={!loading ? renderEmptyState : null}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -192,7 +205,7 @@ const GratitudeHistoryScreen = ({ navigation }) => {
       />
 
       {/* Loading state */}
-      {isLoading && (
+      {loading && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>⏳ Cargando tus momentos de gratitud...</Text>
         </View>
@@ -206,6 +219,16 @@ const GratitudeHistoryScreen = ({ navigation }) => {
           </Text>
         </View>
       )}
+
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
     </View>
   );
 };

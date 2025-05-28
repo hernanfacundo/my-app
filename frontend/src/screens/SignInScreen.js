@@ -1,24 +1,32 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import modernTheme from './modernTheme';
 import config from '../config';
+import CustomModal from '../components/CustomModal';
+import useCustomModal from '../hooks/useCustomModal';
 
 const SignInScreen = ({ navigation }) => {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { modalState, showModal, hideModal } = useCustomModal();
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('¡Oops! 📝', 'Por favor llena todos los campos para continuar');
+      showModal({
+        title: '¡Oops! 📝',
+        message: 'Por favor llena todos los campos para continuar',
+        emoji: '📝',
+        buttonText: 'Entendido'
+      });
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     try {
       console.log('Iniciando proceso de login...');
       const response = await axios.post(`${config.API_BASE_URL}/auth/signin`, { email, password });
@@ -29,86 +37,103 @@ const SignInScreen = ({ navigation }) => {
       
       console.log('Login completado en SignInScreen');
     } catch (error) {
-      console.error('Error en login:', error);
-      Alert.alert('Error de acceso 🔐', 'No pudimos encontrar tu cuenta. ¿Verificaste tu email y contraseña?');
+      console.error('Error en login:', error.response?.data || error.message);
+      showModal({
+        title: 'Error de acceso 🔐',
+        message: 'No pudimos encontrar tu cuenta. ¿Verificaste tu email y contraseña?',
+        emoji: '🔐',
+        buttonText: 'Intentar de nuevo'
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header juvenil */}
-      <View style={styles.header}>
-        <Text style={styles.welcomeEmoji}>👋</Text>
-        <Text style={styles.title}>¡Hola de nuevo!</Text>
-        <Text style={styles.subtitle}>Nos da mucho gusto verte por aquí</Text>
-      </View>
-
-      {/* Formulario moderno */}
-      <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>📧 Tu email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ejemplo@correo.com"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+    <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Header juvenil */}
+        <View style={styles.header}>
+          <Text style={styles.welcomeEmoji}>👋</Text>
+          <Text style={styles.title}>¡Hola de nuevo!</Text>
+          <Text style={styles.subtitle}>Nos da mucho gusto verte por aquí</Text>
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>🔒 Tu contraseña</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Tu contraseña súper secreta"
-            placeholderTextColor={modernTheme.colors.secondaryText}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+        {/* Formulario moderno */}
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>📧 Tu email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="ejemplo@correo.com"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>🔒 Tu contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Tu contraseña súper secreta"
+              placeholderTextColor={modernTheme.colors.secondaryText}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          {/* Botón principal */}
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && styles.buttonDisabled]}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? '⏳ Entrando...' : '🚀 ¡Entrar!'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Separador */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Botón secundario */}
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('SignUp')}
+          >
+            <Text style={styles.secondaryButtonText}>
+              ✨ Crear cuenta nueva
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Botón principal */}
-        <TouchableOpacity
-          style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-          onPress={handleSignIn}
-          disabled={isLoading}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isLoading ? '⏳ Entrando...' : '🚀 ¡Entrar!'}
+        {/* Footer motivacional */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            💡 ¿Sabías que? Registrar tus emociones te ayuda a conocerte mejor
           </Text>
-        </TouchableOpacity>
-
-        {/* Separador */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>o</Text>
-          <View style={styles.dividerLine} />
         </View>
-
-        {/* Botón secundario */}
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('SignUp')}
-        >
-          <Text style={styles.secondaryButtonText}>
-            ✨ Crear cuenta nueva
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Footer motivacional */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          💡 ¿Sabías que? Registrar tus emociones te ayuda a conocerte mejor
-        </Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      
+      {/* Modal personalizado */}
+      <CustomModal
+        visible={modalState.visible}
+        title={modalState.title}
+        message={modalState.message}
+        emoji={modalState.emoji}
+        buttonText={modalState.buttonText}
+        onClose={hideModal}
+      />
+    </View>
   );
 };
 

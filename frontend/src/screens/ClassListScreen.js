@@ -54,74 +54,7 @@ const ClassListScreen = ({ navigation }) => {
     }
   };
 
-  const viewClassAnalysis = async (classId, className) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${config.API_BASE_URL}/classes/${classId}/analysis`,
-        {
-          headers: { Authorization: `Bearer ${user.token}` }
-        }
-      );
 
-      // Separar alertas por severidad
-      const highAlerts = response.data.alerts.filter(a => a.severity === 'HIGH');
-      const mediumAlerts = response.data.alerts.filter(a => a.severity === 'MEDIUM');
-      const lowAlerts = response.data.alerts.filter(a => a.severity === 'LOW');
-
-      // Primero mostrar alertas si hay alguna de alta severidad
-      if (highAlerts.length > 0) {
-        Alert.alert(
-          '⚠️ Alertas Importantes',
-          `Se han detectado ${highAlerts.length} situaciones que requieren atención inmediata en "${className}":\n\n` +
-          highAlerts.map(alert => `• ${alert.description} (${alert.studentId.name})`).join('\n\n'),
-          [
-            {
-              text: 'Ver Análisis Completo',
-              onPress: () => showFullAnalysis(response.data, className)
-            },
-            { text: 'Cerrar', style: 'cancel' }
-          ]
-        );
-      } else {
-        // Si no hay alertas críticas, mostrar el análisis directamente
-        showFullAnalysis(response.data, className);
-      }
-    } catch (error) {
-      console.error('Error al obtener análisis:', error);
-      Alert.alert('Error de análisis 📊', 'No se pudo obtener el análisis de la clase. ¿Intentas de nuevo?');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const showFullAnalysis = (data, className) => {
-    const alertSummary = data.alerts.length > 0 
-      ? '\n\n🚨 Alertas Activas:\n' + data.alerts
-          .map(a => `• ${a.severity === 'HIGH' ? '🔴' : a.severity === 'MEDIUM' ? '🟡' : '🟢'} ${a.description}`)
-          .join('\n')
-      : '\n\n✅ No hay alertas activas';
-
-    Alert.alert(
-      `📊 Análisis de "${className}"`,
-      data.insights + alertSummary,
-      [
-        {
-          text: '📈 Ver Estadísticas',
-          onPress: () => {
-            Alert.alert(
-              '📈 Estadísticas Detalladas',
-              `👥 Tamaño de la clase: ${data.classSize} estudiantes\n\n` +
-              `😊 Estados de ánimo registrados: ${data.moodAnalysis.total}\n` +
-              `🙏 Entradas de gratitud: ${data.gratitudeAnalysis.total}\n` +
-              `✨ Estudiantes practicando gratitud: ${data.gratitudeAnalysis.studentsWithGratitude}`
-            );
-          }
-        },
-        { text: 'Cerrar', style: 'cancel' }
-      ]
-    );
-  };
 
   const onRefresh = () => {
     loadClasses(true);
@@ -148,7 +81,7 @@ const ClassListScreen = ({ navigation }) => {
         styles.classCard,
         { borderLeftColor: getClassColor(index) }
       ]}
-      onPress={() => user?.role === 'teacher' ? viewClassAnalysis(item._id, item.name) : null}
+      onPress={() => user?.role === 'teacher' ? navigation.navigate('ClassSummary', { classId: item._id, className: item.name }) : null}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
@@ -172,7 +105,7 @@ const ClassListScreen = ({ navigation }) => {
             <Text style={styles.codeLabel}>Código:</Text>
             <Text style={styles.classCode}>{item.code}</Text>
           </View>
-          <Text style={styles.tapHint}>Toca para ver análisis</Text>
+          <Text style={styles.tapHint}>Toca para ver resumen</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -275,7 +208,7 @@ const ClassListScreen = ({ navigation }) => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             {user?.role === 'teacher' 
-              ? '💡 Tip: Toca una clase para ver el análisis emocional de tus estudiantes'
+              ? '💡 Tip: Toca una clase para ver el resumen y estadísticas de tus estudiantes'
               : '📚 Tienes acceso a todas las funciones de bienestar emocional'}
           </Text>
         </View>

@@ -17,6 +17,7 @@ import SignUpScreen    from './src/screens/SignUpScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import DirectivoDashboard from './src/screens/DirectivoDashboard';
 import AnalisisDetallado from './src/screens/AnalisisDetallado';
+import AnalisisPorCurso from './src/screens/AnalisisPorCurso';
 
 // Funcionalidades de clases
 import ClassListScreen from './src/screens/ClassListScreen';
@@ -41,6 +42,11 @@ import CreateClassScreen from './src/screens/CreateClassScreen';
 
 // Insignias
 import BadgesScreen from './src/screens/BadgesScreen';
+
+// Cápsulas de autocuidado para docentes
+import CapsulasBienestarScreen from './src/screens/CapsulasBienestarScreen';
+import CapsulaDetalleScreen from './src/screens/CapsulaDetalleScreen';
+import CapsulasGuardadasScreen from './src/screens/CapsulasGuardadasScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -90,6 +96,9 @@ function AppNavigator() {
 
                   {/* Análisis detallado para directivos */}
                   <Stack.Screen name="AnalisisDetallado" component={AnalisisDetallado} />
+                  
+                  {/* Análisis por curso para directivos */}
+                  <Stack.Screen name="AnalisisPorCurso" component={AnalisisPorCurso} />
 
                   {/* Clases */}
                   <Stack.Screen name="ClassList" component={ClassListScreen} />
@@ -116,6 +125,11 @@ function AppNavigator() {
                   
                   {/* Insignias */}
                   <Stack.Screen name="Badges" component={BadgesScreen} />
+                  
+                  {/* Cápsulas de autocuidado para docentes */}
+                  <Stack.Screen name="CapsulasBienestar" component={CapsulasBienestarScreen} />
+                  <Stack.Screen name="CapsulaDetalle" component={CapsulaDetalleScreen} />
+                  <Stack.Screen name="CapsulasGuardadas" component={CapsulasGuardadasScreen} />
                 </Stack.Navigator>
               </TutorialWrapper>
             )}

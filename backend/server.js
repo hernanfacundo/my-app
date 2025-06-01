@@ -1,6 +1,16 @@
 require('dotenv').config();
-//require('dns').setDefaultResultOrder('ipv4first'); // <— nuevo
+
+// 🔧 CONFIGURACIÓN MEJORADA PARA MONGODB ATLAS
+// Configurar DNS para resolver problemas de conectividad
+require('dns').setDefaultResultOrder('ipv4first');
+
+// Configurar servidores DNS alternativos
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4', '208.67.222.222']);
+
+console.log('🌐 DNS configurado con servidores alternativos');
 console.log('JWT_SECRET:', process.env.JWT_SECRET);
+
 const express = require('express');
 const cors = require('cors'); // <-- Agrega esta línea
 const mongoose = require('mongoose');
@@ -18,14 +28,46 @@ const Membership = require('./models/Membership');
 const AlertAnalysisService = require('./services/alertAnalysis.service');
 const Alert = require('./models/Alert');
 
-
 const app = express();
 app.use(cors()); // <-- Aplica CORS a todas las rutas
 app.use(express.json());
 
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Conectado a MongoDB'))
-  .catch(err => console.error('Error conectando a MongoDB:', err));
+// Agregar esta línea para servir archivos estáticos
+app.use('/public', express.static('public'));
+
+// 🔧 OPCIONES DE CONEXIÓN MEJORADAS PARA MONGODB
+const mongoOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 30000,    // 30 segundos
+  socketTimeoutMS: 45000,             // 45 segundos  
+  connectTimeoutMS: 30000,            // 30 segundos
+  heartbeatFrequencyMS: 10000,        // 10 segundos
+  retryWrites: true,
+  maxPoolSize: 10,                    // Mantener hasta 10 conexiones
+  serverApi: '1',                     // Usar versión estable de API
+  family: 4                           // Forzar IPv4
+};
+
+console.log('🔗 Intentando conectar a MongoDB con configuración mejorada...');
+
+mongoose.connect(process.env.MONGODB_URI, mongoOptions)
+  .then(() => {
+    console.log('✅ Conectado exitosamente a MongoDB');
+    console.log('🎯 Base de datos:', mongoose.connection.name);
+  })
+  .catch(err => {
+    console.error('❌ Error conectando a MongoDB:', err);
+    console.log('\n💡 SOLUCIONES SUGERIDAS:');
+    console.log('   1. Verificar que la IP esté en la whitelist de MongoDB Atlas');
+    console.log('   2. Verificar credenciales en MONGODB_URI');
+    console.log('   3. Verificar conexión a internet');
+    console.log('   4. Probar ejecutar: node backend/scripts/diagnoseMongoDB.js');
+    console.log('   5. Considerar usar MongoDB local para desarrollo');
+    
+    // No terminar el proceso, permitir que el servidor siga funcionando
+    console.log('⚠️  Servidor iniciando sin conexión a base de datos...');
+  });
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -782,5 +824,9 @@ app.use('/api/badges', badgeRoutes);
 const directivoRoutes = require('./routes/directivo.routes');
 app.use('/api/directivo', directivoRoutes);
 
+// ——— RUTAS DE DOCENTE/TEACHER ———
+const teacherRoutes = require('./routes/teacher.routes');
+app.use('/api/teacher', teacherRoutes);
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Servidor corriendo en el puerto ${PORT} en todas las interfaces`));

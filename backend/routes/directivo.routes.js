@@ -250,6 +250,153 @@ router.get('/clima-emocional-diario', verifyDirectivo, async (req, res) => {
   }
 });
 
+// Endpoint para obtener análisis emocional por curso
+router.get('/clima-emocional-por-curso', verifyDirectivo, async (req, res) => {
+  try {
+    console.log('🏫 [Directivo] Calculando clima emocional por curso...');
+    
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    const startOfPeriod = new Date(sevenDaysAgo.getFullYear(), sevenDaysAgo.getMonth(), sevenDaysAgo.getDate());
+    
+    // 1. Obtener todas las clases del sistema (asumiendo una escuela)
+    const Class = require('../models/Class');
+    const User = require('../models/User');
+    
+    const clases = await Class.find({}).populate('docenteId', 'name');
+    console.log(`📚 [Directivo] Encontradas ${clases.length} clases`);
+    
+    const analisisPorCurso = [];
+    
+    for (const clase of clases) {
+      // 2. Obtener estudiantes de esta clase
+      const estudiantes = await User.find({ 
+        classId: clase._id,
+        role: 'student'
+      });
+      
+      const studentIds = estudiantes.map(e => e._id);
+      
+      if (studentIds.length === 0) {
+        console.log(`⚠️  [Directivo] Clase ${clase.name} sin estudiantes`);
+        continue;
+      }
+      
+      // 3. Obtener moods de hoy para esta clase
+      const moodsHoy = await Mood.find({
+        userId: { $in: studentIds },
+        createdAt: { $gte: startOfDay, $lt: endOfDay }
+      });
+      
+      // 4. Obtener moods de los últimos 7 días para esta clase
+      const moodsPeriodo = await Mood.find({
+        userId: { $in: studentIds },
+        createdAt: { $gte: startOfPeriod, $lt: endOfDay }
+      });
+      
+      // 5. Calcular estadísticas del curso
+      const MINIMO_REGISTROS_CURSO = 3; // Mínimo más bajo para curso individual
+      
+      let climaHoy = null;
+      let tendencia7Dias = null;
+      
+      // Análisis de hoy
+      if (moodsHoy.length >= MINIMO_REGISTROS_CURSO) {
+        climaHoy = calcularEstadisticasClima(moodsHoy);
+        climaHoy.suficientesRegistros = true;
+      } else {
+        climaHoy = {
+          suficientesRegistros: false,
+          totalRegistros: moodsHoy.length,
+          minimoRequerido: MINIMO_REGISTROS_CURSO,
+          mensaje: `Necesita al menos ${MINIMO_REGISTROS_CURSO} registros`
+        };
+      }
+      
+      // Análisis de 7 días
+      if (moodsPeriodo.length >= MINIMO_REGISTROS_CURSO) {
+        tendencia7Dias = calcularTendencias7Dias(moodsPeriodo, sevenDaysAgo, today);
+        tendencia7Dias.suficientesRegistros = true;
+        tendencia7Dias.totalRegistros = moodsPeriodo.length;
+      } else {
+        tendencia7Dias = {
+          suficientesRegistros: false,
+          totalRegistros: moodsPeriodo.length,
+          minimoRequerido: MINIMO_REGISTROS_CURSO,
+          mensaje: `Necesita al menos ${MINIMO_REGISTROS_CURSO} registros`
+        };
+      }
+      
+      // 6. Agregar análisis del curso
+      analisisPorCurso.push({
+        curso: {
+          id: clase._id,
+          nombre: clase.name,
+          codigo: clase.code,
+          docente: clase.docenteId.name,
+          totalEstudiantes: estudiantes.length
+        },
+        climaHoy: {
+          ...climaHoy,
+          fecha: today.toISOString().split('T')[0]
+        },
+        tendencia7Dias: {
+          ...tendencia7Dias,
+          periodo: {
+            inicio: sevenDaysAgo.toISOString().split('T')[0],
+            fin: today.toISOString().split('T')[0]
+          }
+        },
+        participacion: {
+          registrosHoy: moodsHoy.length,
+          registros7Dias: moodsPeriodo.length,
+          porcentajeParticipacionHoy: estudiantes.length > 0 ? 
+            Math.round((new Set(moodsHoy.map(m => m.userId.toString())).size / estudiantes.length) * 100) : 0,
+          porcentajeParticipacion7Dias: estudiantes.length > 0 ? 
+            Math.round((new Set(moodsPeriodo.map(m => m.userId.toString())).size / estudiantes.length) * 100) : 0
+        }
+      });
+      
+      console.log(`📊 [Directivo] ${clase.name}: ${moodsHoy.length} registros hoy, ${moodsPeriodo.length} en 7 días`);
+    }
+    
+    // 7. Calcular resumen general
+    const resumenGeneral = {
+      totalCursos: clases.length,
+      cursosConDatosHoy: analisisPorCurso.filter(c => c.climaHoy.suficientesRegistros).length,
+      cursosCon7Dias: analisisPorCurso.filter(c => c.tendencia7Dias.suficientesRegistros).length,
+      totalEstudiantes: analisisPorCurso.reduce((sum, c) => sum + c.curso.totalEstudiantes, 0),
+      totalRegistrosHoy: analisisPorCurso.reduce((sum, c) => sum + c.participacion.registrosHoy, 0),
+      totalRegistros7Dias: analisisPorCurso.reduce((sum, c) => sum + c.participacion.registros7Dias, 0)
+    };
+    
+    // 8. Ordenar cursos por registros de hoy (más activos primero)
+    analisisPorCurso.sort((a, b) => b.participacion.registrosHoy - a.participacion.registrosHoy);
+    
+    console.log(`✅ [Directivo] Análisis por curso completado: ${analisisPorCurso.length} cursos analizados`);
+    
+    res.json({
+      success: true,
+      data: {
+        resumenGeneral,
+        cursos: analisisPorCurso,
+        ultimaActualizacion: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [Directivo] Error en análisis por curso:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar el análisis por curso'
+    });
+  }
+});
+
 // Función auxiliar para calcular estadísticas del clima emocional
 function calcularEstadisticasClima(moods) {
   if (!moods || moods.length === 0) {

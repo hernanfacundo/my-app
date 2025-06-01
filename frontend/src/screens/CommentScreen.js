@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import globalStyles from '../screens/globalStyles';
@@ -9,6 +9,8 @@ import config from '../config';
 const CommentScreen = ({ navigation, route }) => {
   const { mood, emotion, place } = route.params || {};
   const [comment, setComment] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
 
   // Función para decodificar el token manualmente
   const decodeToken = (token) => {
@@ -30,44 +32,82 @@ const CommentScreen = ({ navigation, route }) => {
 
   const handleSaveMood = async () => {
     try {
+      setIsLoading(true);
+      setLoadingStep('🔐 Verificando autenticación...');
+
       const token = await AsyncStorage.getItem('userToken');
       if (!token) throw new Error('No token found');
   
       const decodedToken = decodeToken(token);
       const userEmail = decodedToken.email || 'Usuario';
       const userName = userEmail.split('@')[0];
-  
+      
+      setLoadingStep('💾 Guardando tu estado emocional...');
+      
       const url = `${config.API_BASE_URL.replace(/\/api$/, '')}/api/moods`;
       console.log('Enviando solicitud a:', url, 'con datos:', { mood, emotion, place, comment });
+      
       await axios.post(
         url,
         { mood, emotion, place, comment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
+      setLoadingStep('🧠 Generando análisis personalizado...');
+
       const response = await axios.post(
         `${config.API_BASE_URL.replace(/\/api$/, '')}/api/analyze-emotions`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const personalizedMessage = response.data.analysis || 'Hola, no tengo suficiente info para charlar, pero estoy acá para vos. ¿Qué te gustaría contarme?';
+      
+      setLoadingStep('✨ Finalizando...');
+      
+      // Pequeña pausa para que el usuario vea el mensaje de finalización
+      setTimeout(() => {
+        setIsLoading(false);
+        setLoadingStep('');
+        
+        const personalizedMessage = response.data.analysis || 'Hola, no tengo suficiente info para charlar, pero estoy acá para vos. ¿Qué te gustaría contarme?';
   
-      Alert.alert(
-        '✨ Estado Guardado',
-        `${personalizedMessage}\n\n¿Te gustaría hablar con nuestro asistente virtual?`,
-        [
-          { text: 'Ahora no', style: 'cancel', onPress: () => navigation.navigate('Dashboard') },
-          { text: 'Sí, hablemos 💬', onPress: () => navigation.navigate('Chatbot', { analysis: personalizedMessage }) },
-        ]
-      );
+        Alert.alert(
+          '✨ Estado Guardado',
+          `${personalizedMessage}\n\n¿Te gustaría hablar con nuestro asistente virtual?`,
+          [
+            { text: 'Ahora no', style: 'cancel', onPress: () => navigation.navigate('Dashboard') },
+            { text: 'Sí, hablemos 💬', onPress: () => navigation.navigate('Chatbot', { analysis: personalizedMessage }) },
+          ]
+        );
+      }, 800);
+      
     } catch (error) {
       console.error('Error al guardar mood o analizar emociones:', error);
+      setIsLoading(false);
+      setLoadingStep('');
       Alert.alert('Error', 'No se pudo guardar el estado o analizar las emociones');
     }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={modernTheme.colors.turquoise} />
+            <Text style={styles.loadingTitle}>Procesando tu estado emocional</Text>
+            <Text style={styles.loadingStep}>{loadingStep}</Text>
+            <View style={styles.loadingBar}>
+              <View style={[styles.loadingProgress, { 
+                width: loadingStep.includes('Verificando') ? '25%' : 
+                       loadingStep.includes('Guardando') ? '50%' :
+                       loadingStep.includes('Generando') ? '75%' : '100%'
+              }]} />
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Header moderno */}
       <View style={styles.headerContainer}>
         <Text style={styles.mainTitle}>¡Casi terminamos! 🎉</Text>
@@ -77,7 +117,7 @@ const CommentScreen = ({ navigation, route }) => {
       </View>
 
       {/* Resumen de selección */}
-      <View style={styles.summaryContainer}>
+      <View style={[styles.summaryContainer, isLoading && styles.disabledContainer]}>
         <Text style={styles.summaryTitle}>Tu selección:</Text>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
@@ -96,10 +136,10 @@ const CommentScreen = ({ navigation, route }) => {
       </View>
 
       {/* Input de comentario moderno */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, isLoading && styles.disabledContainer]}>
         <Text style={styles.inputLabel}>¿Algo más que quieras agregar? 💭</Text>
         <TextInput
-          style={styles.modernInput}
+          style={[styles.modernInput, isLoading && styles.disabledInput]}
           placeholder="Cuéntanos más sobre cómo te sientes... (opcional)"
           placeholderTextColor={modernTheme.colors.secondaryText}
           value={comment}
@@ -107,6 +147,7 @@ const CommentScreen = ({ navigation, route }) => {
           multiline
           numberOfLines={4}
           textAlignVertical="top"
+          editable={!isLoading}
         />
         <Text style={styles.inputHint}>
           💡 Tip: Escribir sobre tus emociones puede ayudarte a procesarlas mejor
@@ -116,26 +157,42 @@ const CommentScreen = ({ navigation, route }) => {
       {/* Botones de acción */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
-          style={styles.saveButton} 
+          style={[styles.saveButton, isLoading && styles.disabledButton]} 
           onPress={handleSaveMood}
+          disabled={isLoading}
         >
-          <View style={styles.saveButtonIcon}>
-            <Text style={styles.saveButtonIconText}>💾</Text>
-          </View>
-          <View style={styles.saveButtonContent}>
-            <Text style={styles.saveButtonTitle}>Guardar mi Estado</Text>
-            <Text style={styles.saveButtonSubtitle}>Y obtener análisis personalizado</Text>
-          </View>
-          <View style={styles.saveButtonArrow}>
-            <Text style={styles.saveButtonArrowText}>→</Text>
-          </View>
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="small" color="white" />
+              <View style={styles.saveButtonContent}>
+                <Text style={styles.saveButtonTitle}>Guardando...</Text>
+                <Text style={styles.saveButtonSubtitle}>Un momento por favor</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.saveButtonIcon}>
+                <Text style={styles.saveButtonIconText}>💾</Text>
+              </View>
+              <View style={styles.saveButtonContent}>
+                <Text style={styles.saveButtonTitle}>Guardar mi Estado</Text>
+                <Text style={styles.saveButtonSubtitle}>Y obtener análisis personalizado</Text>
+              </View>
+              <View style={styles.saveButtonArrow}>
+                <Text style={styles.saveButtonArrowText}>→</Text>
+              </View>
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.skipButton}
+          style={[styles.skipButton, isLoading && styles.disabledButton]}
           onPress={() => handleSaveMood()}
+          disabled={isLoading}
         >
-          <Text style={styles.skipButtonText}>Guardar sin comentario</Text>
+          <Text style={[styles.skipButtonText, isLoading && styles.disabledText]}>
+            {isLoading ? 'Procesando...' : 'Guardar sin comentario'}
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -149,6 +206,64 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: modernTheme.spacing.paddingLarge,
+  },
+  // Estilos de loading
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.large,
+    padding: modernTheme.spacing.paddingXLarge,
+    alignItems: 'center',
+    margin: modernTheme.spacing.marginLarge,
+    ...modernTheme.shadows.large,
+  },
+  loadingTitle: {
+    fontSize: modernTheme.fontSizes.title,
+    fontWeight: '700',
+    color: modernTheme.colors.primaryText,
+    marginTop: modernTheme.spacing.marginMedium,
+    marginBottom: modernTheme.spacing.marginSmall,
+    textAlign: 'center',
+  },
+  loadingStep: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.turquoise,
+    marginBottom: modernTheme.spacing.marginLarge,
+    textAlign: 'center',
+  },
+  loadingBar: {
+    width: 200,
+    height: 6,
+    backgroundColor: modernTheme.colors.lavender,
+    borderRadius: modernTheme.borderRadius.small,
+    overflow: 'hidden',
+  },
+  loadingProgress: {
+    height: '100%',
+    backgroundColor: modernTheme.colors.turquoise,
+    borderRadius: modernTheme.borderRadius.small,
+  },
+  disabledContainer: {
+    opacity: 0.6,
+  },
+  disabledInput: {
+    backgroundColor: modernTheme.colors.lavender,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  disabledText: {
+    color: modernTheme.colors.secondaryText,
   },
   headerContainer: {
     alignItems: 'center',

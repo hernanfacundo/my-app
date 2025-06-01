@@ -15,6 +15,7 @@ import BadgeService from '../services/badgeService';
 import BadgeNotificationModal from '../components/BadgeNotificationModal';
 import CustomModal from '../components/CustomModal';
 import TutorialDebug from '../components/TutorialDebug';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 // Componente CustomButton con nuevo diseño
 const CustomButton = ({ title, onPress, variant = 'primary' }) => {
@@ -53,6 +54,8 @@ const DashboardScreen = ({ navigation }) => {
   const [learningPaths, setLearningPaths] = useState([]);
   const [hasGratitudeToday, setHasGratitudeToday] = useState(true);
   const [isLoadingGratitude, setIsLoadingGratitude] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState('');
   
   // Estados para insignias
   const [recentBadges, setRecentBadges] = useState([]);
@@ -152,6 +155,7 @@ const DashboardScreen = ({ navigation }) => {
   useEffect(() => {
     const fetchLearningPaths = async () => {
       try {
+        setLoadingStep('📚 Cargando rutas de aprendizaje...');
         const token = await AsyncStorage.getItem('userToken');
         if (!token) throw new Error('No token found');
         const response = await axios.get(
@@ -165,6 +169,66 @@ const DashboardScreen = ({ navigation }) => {
       }
     };
     fetchLearningPaths();
+  }, [navigation]);
+
+  // Función principal para cargar todos los datos iniciales
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setIsInitialLoading(true);
+        setLoadingStep('🔐 Verificando autenticación...');
+        
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          setIsInitialLoading(false);
+          showCustomModal({
+            title: 'Error',
+            message: 'Por favor, inicia sesión nuevamente',
+            emoji: '🔐',
+            buttonText: 'Ir a inicio'
+          });
+          navigation.navigate('SignIn');
+          return;
+        }
+
+        // Cargar rutas de aprendizaje
+        setLoadingStep('📚 Cargando rutas de aprendizaje...');
+        const pathsResponse = await axios.get(
+          `${config.API_BASE_URL}/learning-paths`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setLearningPaths(pathsResponse.data.data.slice(0, 4));
+
+        // Verificar gratitud de hoy
+        setLoadingStep('✨ Verificando tu gratitud de hoy...');
+        await checkGratitudeToday();
+
+        // Cargar insignias
+        setLoadingStep('🏆 Cargando tus logros...');
+        await loadRecentBadges();
+
+        setLoadingStep('🎉 ¡Listo!');
+        
+        // Pequeña pausa para mostrar "Listo"
+        setTimeout(() => {
+          setIsInitialLoading(false);
+          setLoadingStep('');
+        }, 500);
+
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setIsInitialLoading(false);
+        setLoadingStep('');
+        showCustomModal({
+          title: 'Error de carga 📱',
+          message: 'No pudimos cargar algunos datos. ¿Intentas refrescar?',
+          emoji: '📱',
+          buttonText: 'Entendido'
+        });
+      }
+    };
+
+    loadInitialData();
   }, [navigation]);
 
   // Verificar gratitud de hoy
@@ -198,7 +262,6 @@ const DashboardScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error al verificar gratitud:',
         error.response?.data || error.message);
-      setHasGratitudeToday(true);
     } finally {
       setIsLoadingGratitude(false);
     }
@@ -251,7 +314,7 @@ const DashboardScreen = ({ navigation }) => {
           <View style={styles.actionCardsContainer}>
             <TouchableOpacity 
               style={[styles.actionCard, styles.primaryActionCard]}
-          onPress={() => navigation.navigate('ClassList')}
+              onPress={() => navigation.navigate('ClassList')}
             >
               <View style={styles.cardIcon}>
                 <Text style={styles.cardIconText}>📚</Text>
@@ -265,7 +328,21 @@ const DashboardScreen = ({ navigation }) => {
               </View>
             </TouchableOpacity>
 
-
+            <TouchableOpacity 
+              style={[styles.actionCard, styles.bienestarActionCard]}
+              onPress={() => navigation.navigate('CapsulasBienestar')}
+            >
+              <View style={styles.cardIcon}>
+                <Text style={styles.cardIconText}>🧘‍♂️</Text>
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Tu Bienestar</Text>
+                <Text style={styles.cardSubtitle}>Cápsulas de autocuidado</Text>
+              </View>
+              <View style={styles.cardArrow}>
+                <Text style={styles.cardArrowText}>→</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -571,6 +648,18 @@ const DashboardScreen = ({ navigation }) => {
       />
       
       <TutorialDebug />
+      
+      <LoadingOverlay 
+        visible={isInitialLoading} 
+        title="Cargando tu dashboard"
+        step={loadingStep}
+        progress={
+          loadingStep.includes('Verificando') ? 25 : 
+          loadingStep.includes('rutas') ? 50 :
+          loadingStep.includes('gratitud') ? 75 :
+          loadingStep.includes('logros') ? 90 : 100
+        }
+      />
     </View>
   );
 };
@@ -733,7 +822,7 @@ const styles = StyleSheet.create({
     backgroundColor: modernTheme.colors.turquoise,
     borderColor: modernTheme.colors.turquoise,
   },
-  secondaryActionCard: {
+  bienestarActionCard: {
     backgroundColor: modernTheme.colors.coral,
     borderColor: modernTheme.colors.coral,
   },

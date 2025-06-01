@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  Alert, StyleSheet, ScrollView
+  Alert, StyleSheet, ScrollView, ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -14,6 +14,7 @@ import useCustomModal from '../hooks/useCustomModal';
 export default function GratitudeEntryScreen({ navigation }) {
   const [gratitude, setGratitude] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
   const { modalState, showModal, hideModal } = useCustomModal();
 
   const saveGratitude = async () => {
@@ -30,8 +31,12 @@ export default function GratitudeEntryScreen({ navigation }) {
 
     try {
       setLoading(true);
+      setLoadingStep('🔐 Verificando tu sesión...');
+
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
+        setLoading(false);
+        setLoadingStep('');
         showModal({
           title: 'Sesión expirada 🔐',
           message: 'Por favor, inicia sesión nuevamente para continuar',
@@ -41,6 +46,8 @@ export default function GratitudeEntryScreen({ navigation }) {
         navigation.navigate('SignIn');
         return;
       }
+
+      setLoadingStep('💾 Guardando tu momento de gratitud...');
 
       console.log('Token enviado al backend:', token);
       console.log('URL de la solicitud:', `${config.API_BASE_URL}/gratitude`);
@@ -54,37 +61,77 @@ export default function GratitudeEntryScreen({ navigation }) {
 
       console.log('Respuesta del servidor:', response.data);
 
-      // Extraemos la reflexión generada por OpenAI
-      const { reflect } = response.data;
+      setLoadingStep('🧠 Generando reflexión personalizada...');
 
-      // Mostramos esa reflexión en lugar de un mensaje genérico
-      Alert.alert(
-        '¡Increíble! 🌟 ¿Quieres profundizar en tu gratitud?',
-        reflect,
-        [
-          {
-            text: '💬 ¡Charlemos!',
-            onPress: () => navigation.navigate('Chatbot', { initialPrompt: reflect })
-          },
-          {
-            text: '✨ Perfecto así',
-            style: 'cancel',
-            onPress: () => navigation.goBack()
-          }
-        ],
-        { cancelable: false }
-      );
+      // Pequeña pausa para mostrar el progreso
+      setTimeout(() => {
+        setLoadingStep('🏆 Verificando logros alcanzados...');
+        
+        setTimeout(() => {
+          setLoadingStep('✨ Finalizando...');
+          
+          setTimeout(() => {
+            setLoading(false);
+            setLoadingStep('');
 
-      showModal({
-        title: '¡Gratitud guardada! ✨',
-        message: 'Tu momento de gratitud se guardó con amor. ¡Sigue cultivando la positividad! 🌱💚',
-        emoji: '✨',
-        buttonText: '¡Genial!'
-      });
+            // Extraemos la reflexión generada por OpenAI y las nuevas insignias
+            const { reflect, newBadges = [] } = response.data;
 
-      setGratitude('');
+            // Si hay nuevas insignias, mostrarlas primero
+            if (newBadges && newBadges.length > 0) {
+              const badgeText = newBadges.map(badge => `${badge.emoji} ${badge.name}`).join('\n');
+              Alert.alert(
+                '🎉 ¡Insignias Desbloqueadas!',
+                `¡Felicidades! Has conseguido:\n\n${badgeText}\n\n${reflect}`,
+                [
+                  {
+                    text: '💬 ¡Charlemos!',
+                    onPress: () => navigation.navigate('Chatbot', { initialPrompt: reflect })
+                  },
+                  {
+                    text: '✨ Perfecto así',
+                    style: 'cancel',
+                    onPress: () => navigation.goBack()
+                  }
+                ],
+                { cancelable: false }
+              );
+            } else {
+              // Sin nuevas insignias, mostrar solo la reflexión
+              Alert.alert(
+                '¡Increíble! 🌟 ¿Quieres profundizar en tu gratitud?',
+                reflect,
+                [
+                  {
+                    text: '💬 ¡Charlemos!',
+                    onPress: () => navigation.navigate('Chatbot', { initialPrompt: reflect })
+                  },
+                  {
+                    text: '✨ Perfecto así',
+                    style: 'cancel',
+                    onPress: () => navigation.goBack()
+                  }
+                ],
+                { cancelable: false }
+              );
+            }
+
+            showModal({
+              title: '¡Gratitud guardada! ✨',
+              message: 'Tu momento de gratitud se guardó con amor. ¡Sigue cultivando la positividad! 🌱💚',
+              emoji: '✨',
+              buttonText: '¡Genial!'
+            });
+
+            setGratitude('');
+          }, 600);
+        }, 800);
+      }, 800);
+
     } catch (error) {
       console.error('Error al enviar la solicitud al backend:', error.message);
+      setLoading(false);
+      setLoadingStep('');
       
       if (error.response?.status === 401) {
         showModal({
@@ -102,8 +149,6 @@ export default function GratitudeEntryScreen({ navigation }) {
           buttonText: 'Intentar de nuevo'
         });
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -133,16 +178,35 @@ export default function GratitudeEntryScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={modernTheme.colors.turquoise} />
+            <Text style={styles.loadingTitle}>Procesando tu gratitud</Text>
+            <Text style={styles.loadingStep}>{loadingStep}</Text>
+            <View style={styles.loadingBar}>
+              <View style={[styles.loadingProgress, { 
+                width: loadingStep.includes('Verificando') ? '20%' : 
+                       loadingStep.includes('Guardando') ? '40%' :
+                       loadingStep.includes('Generando') ? '70%' :
+                       loadingStep.includes('Verificando logros') ? '90%' : '100%'
+              }]} />
+            </View>
+          </View>
+        </View>
+      )}
+
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         {/* Header inspiracional */}
-        <View style={styles.header}>
+        <View style={[styles.header, loading && styles.disabledContainer]}>
           <Text style={styles.headerEmoji}>🙏</Text>
           <Text style={styles.title}>Momento de Gratitud</Text>
           <Text style={styles.subtitle}>Tómate un momento para reflexionar sobre lo bueno de tu día</Text>
         </View>
 
         {/* Tarjeta motivacional */}
-        <View style={styles.motivationCard}>
+        <View style={[styles.motivationCard, loading && styles.disabledContainer]}>
           <Text style={styles.motivationTitle}>💡 ¿Sabías que?</Text>
           <Text style={styles.motivationText}>
             Practicar gratitud por solo 5 minutos al día puede mejorar tu bienestar emocional y reducir el estrés. ¡Cada pequeño momento cuenta!
@@ -150,12 +214,12 @@ export default function GratitudeEntryScreen({ navigation }) {
         </View>
 
         {/* Formulario principal */}
-        <View style={styles.formContainer}>
+        <View style={[styles.formContainer, loading && styles.disabledContainer]}>
           <Text style={styles.inputLabel}>✨ Hoy me siento agradecido/a por...</Text>
           
           <View style={styles.textInputContainer}>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, loading && styles.disabledInput]}
               placeholder={getPlaceholderSuggestion()}
               placeholderTextColor={modernTheme.colors.secondaryText}
               value={gratitude}
@@ -174,21 +238,29 @@ export default function GratitudeEntryScreen({ navigation }) {
           </View>
 
           <TouchableOpacity
-            style={[styles.saveButton, loading && styles.buttonDisabled]}
+            style={[styles.saveButton, (loading || !gratitude.trim()) && styles.buttonDisabled]}
             onPress={saveGratitude}
             disabled={loading || !gratitude.trim()}
           >
-            <Text style={styles.saveButtonText}>
-              {loading ? '⏳ Guardando tu gratitud...' : '🌟 Guardar mi gratitud'}
-            </Text>
+            {loading ? (
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator size="small" color="white" style={{ marginRight: 10 }} />
+                <Text style={styles.saveButtonText}>Guardando tu gratitud...</Text>
+              </View>
+            ) : (
+              <Text style={styles.saveButtonText}>🌟 Guardar mi gratitud</Text>
+            )}
           </TouchableOpacity>
 
           {/* Botón para ver historial */}
           <TouchableOpacity
-            style={styles.historyButton}
+            style={[styles.historyButton, loading && styles.buttonDisabled]}
             onPress={() => navigation.navigate('GratitudeHistory')}
+            disabled={loading}
           >
-            <Text style={styles.historyButtonText}>📖 Ver mi historial de gratitud</Text>
+            <Text style={[styles.historyButtonText, loading && styles.disabledText]}>
+              📖 Ver mi historial de gratitud
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -392,5 +464,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     fontStyle: 'italic',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: modernTheme.colors.primaryBackground,
+    padding: modernTheme.spacing.paddingXLarge,
+    borderRadius: modernTheme.borderRadius.medium,
+    alignItems: 'center',
+  },
+  loadingTitle: {
+    fontSize: modernTheme.fontSizes.largeTitle,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  loadingStep: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  loadingBar: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.small,
+    height: 20,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  loadingProgress: {
+    backgroundColor: modernTheme.colors.turquoise,
+    height: '100%',
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  disabledContainer: {
+    opacity: 0.6,
+  },
+  disabledInput: {
+    opacity: 0.6,
+  },
+  disabledText: {
+    opacity: 0.6,
   },
 });

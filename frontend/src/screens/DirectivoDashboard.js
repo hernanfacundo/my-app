@@ -120,9 +120,25 @@ const DirectivoDashboard = ({ navigation }) => {
         )}
       </TouchableOpacity>
 
-
-
-
+      {/* Nueva tarjeta: Análisis por Curso */}
+      <TouchableOpacity 
+        style={styles.analisisCursoCard}
+        onPress={() => navigation.navigate('AnalisisPorCurso')}
+      >
+        <View style={styles.analisisCursoHeader}>
+          <Text style={styles.analisisCursoIcon}>🏫</Text>
+          <Text style={styles.analisisCursoTitle}>Análisis por Curso</Text>
+          <Text style={styles.verMasIcon}>→</Text>
+        </View>
+        <Text style={styles.analisisCursoSubtitle}>
+          Ve el clima emocional específico de cada curso en tu escuela
+        </Text>
+        <View style={styles.analisisHints}>
+          <Text style={styles.analisisHint}>📚 Por materia</Text>
+          <Text style={styles.analisisHint}>👥 Por profesor</Text>
+          <Text style={styles.analisisHint}>📊 Con métricas</Text>
+        </View>
+      </TouchableOpacity>
 
       {/* Resumen Ejecutivo */}
       {climaEmocional && climaEmocional.suficientesRegistros && (
@@ -851,6 +867,46 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: modernTheme.spacing.marginSmall,
     paddingLeft: modernTheme.spacing.paddingSmall,
+  },
+  // Estilos para la nueva tarjeta: Análisis por Curso
+  analisisCursoCard: {
+    backgroundColor: modernTheme.colors.chartBackground,
+    borderRadius: modernTheme.borderRadius.medium,
+    padding: modernTheme.spacing.paddingLarge,
+    marginBottom: modernTheme.spacing.marginXLarge,
+    borderLeftWidth: 4,
+    borderLeftColor: modernTheme.colors.turquoise,
+    ...modernTheme.shadows.medium,
+  },
+  analisisCursoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  analisisCursoIcon: {
+    fontSize: 24,
+    marginRight: modernTheme.spacing.marginMedium,
+  },
+  analisisCursoTitle: {
+    fontSize: modernTheme.fontSizes.title,
+    fontWeight: 'bold',
+    color: modernTheme.colors.primaryText,
+    flex: 1,
+  },
+  analisisCursoSubtitle: {
+    fontSize: modernTheme.fontSizes.body,
+    color: modernTheme.colors.secondaryText,
+    marginBottom: modernTheme.spacing.marginMedium,
+  },
+  analisisHints: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  analisisHint: {
+    fontSize: modernTheme.fontSizes.caption,
+    color: modernTheme.colors.secondaryText,
   },
 });
 

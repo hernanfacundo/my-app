@@ -17,6 +17,10 @@ import ClassListScreen from '../screens/ClassListScreen';
 import JoinClassScreen from '../screens/JoinClassScreen';
 import CreateClassScreen from '../screens/CreateClassScreen';
 import BadgesScreen from '../screens/BadgesScreen';
+// Importaciones de cápsulas de autocuidado
+import CapsulasBienestarScreen from '../screens/CapsulasBienestarScreen';
+import CapsulaDetalleScreen from '../screens/CapsulaDetalleScreen';
+import CapsulasGuardadasScreen from '../screens/CapsulasGuardadasScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -38,6 +42,10 @@ const screens = [
   { name: 'JoinClass', component: JoinClassScreen },
   { name: 'CreateClass', component: CreateClassScreen },
   { name: 'Badges', component: BadgesScreen },
+  // Pantallas de cápsulas de autocuidado
+  { name: 'CapsulasBienestar', component: CapsulasBienestarScreen },
+  { name: 'CapsulaDetalle', component: CapsulaDetalleScreen },
+  { name: 'CapsulasGuardadas', component: CapsulasGuardadasScreen },
 ];
 
 const validScreens = screens.filter(({ component, name }) => {
@@ -59,9 +67,21 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="SignIn">
+      <Stack.Navigator 
+        initialRouteName="SignIn"
+        screenOptions={{
+          headerShown: false, // Ocultar header por defecto
+        }}
+      >
         {validScreens.map(({ name, component }) => (
-          <Stack.Screen key={name} name={name} component={component} />
+          <Stack.Screen 
+            key={name} 
+            name={name} 
+            component={component}
+            options={{
+              headerShown: false,
+            }}
+          />
         ))}
       </Stack.Navigator>
     </NavigationContainer>

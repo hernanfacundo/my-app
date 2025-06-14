@@ -1,6 +1,8 @@
 # Node.js
 node_modules/
 npm-debug.log*
+.env
+config.js
 
 # Xcode (si aplica)
 *.xcworkspace
